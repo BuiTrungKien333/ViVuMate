@@ -1,9 +1,18 @@
 server:
   port: ${SERVER_PORT:8080}
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+      enabled: true
 
 spring:
   application:
     name: ViVuMate
+
+  messages:
+    encoding: UTF-8
+    basename: i18n/messages
 
   profiles:
     active: dev
@@ -53,3 +62,9 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+
+---
+vivumate:
+  weather:
+    api-key: ${OPENWEATHER_API_KEY}
+    base-url: https://api.openweathermap.org/data/2.5/weather

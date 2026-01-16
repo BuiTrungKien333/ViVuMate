@@ -14,16 +14,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // Tắt CSRF vì chúng ta dùng API (Stateful)
                 .csrf(AbstractHttpConfigurer::disable)
 
-                // Cấu hình quyền truy cập
                 .authorizeHttpRequests(auth -> auth
-                        // Cho phép ai cũng được vào trang Health Check và Swagger (sau này)
-                        .requestMatchers("/api/v1/health/**").permitAll()
-
-                        // Các request còn lại bắt buộc phải đăng nhập
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/v1/**").permitAll().anyRequest().authenticated()
                 );
 
         return http.build();
