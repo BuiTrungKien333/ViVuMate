@@ -86,6 +86,17 @@ vivumate:
     api-key: ${OPENWEATHER_API_KEY}
     base-url: https://api.openweathermap.org/data/2.5/weather
 
+  jwt:
+    secret-key: ${JWT_SECRET_KEY} # Access Token
+    refreshKey: ${JWT_REFRESH_KEY} # Refresh Token
+    resetKey: ${JWT_RESET_KEY} # Reset Token
+    access:
+      expiration: 3600000     # 1 giờ
+    refresh:
+      expiration: 604800000   # 7 ngày
+    reset:
+      expiration: 900000      # 15 phút
+
 ---
 management:
   endpoints:
@@ -98,4 +109,9 @@ management:
       show-details: always
       probes:
         enabled: true
+
+---
+logging:
+  level:
+    org.springframework.security: DEBUG
 

@@ -17,6 +17,6 @@ public class Permission extends BaseEntity {
     @Column(nullable = false, unique = true)
     private PermissionCode permissionCode;
 
-    @Column(length = 500)
+    @Column(length = 255)
     private String description;
 }

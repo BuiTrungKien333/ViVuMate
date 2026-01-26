@@ -6,6 +6,7 @@ import com.vivumate.coreapi.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,21 +27,26 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     @Transactional
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-
-        Set<GrantedAuthority> authorities = new HashSet<>();
+                .orElseThrow(() -> new UsernameNotFoundException("USER_NOT_FOUND"));
 
         if (user.getDeletedAt() != null) {
-            log.warn("User {} accessed but has bean deleted", username);
-            throw new UsernameNotFoundException("Account does not exist");
+            log.warn("Deleted user tried to login: {}", username);
+            throw new DisabledException("ACCOUNT_DELETED");
         }
 
-        if (user.getStatus() == UserStatus.BANNED || user.getStatus() == UserStatus.INACTIVE) {
-            log.warn("User {} accessed but is locked/not activated", username);
-            throw new DisabledException("Account is locked or not activated");
+        if (user.getStatus() == UserStatus.BANNED) {
+            log.warn("Banned user tried to login: {}", username);
+            throw new LockedException("ACCOUNT_BANNED");
         }
+
+        if (user.getStatus() == UserStatus.INACTIVE) {
+            log.warn("Inactive user tried to login: {}", username);
+            throw new DisabledException("ACCOUNT_INACTIVE");
+        }
+
+        Set<GrantedAuthority> authorities = new HashSet<>();
 
         user.getRoles().forEach(role -> {
             authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));

@@ -5,6 +5,7 @@ import com.vivumate.coreapi.enums.Gender;
 import com.vivumate.coreapi.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.Nationalized;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
@@ -37,6 +38,7 @@ public class User extends BaseEntity {
     private String phone;
 
     @Column(nullable = false, length = 100)
+    @Nationalized
     private String fullName;
 
     @Enumerated(EnumType.STRING)
@@ -45,6 +47,7 @@ public class User extends BaseEntity {
     private LocalDate dateOfBirth;
 
     @Column(length = 500)
+    @Nationalized
     private String bio;
 
     @Column(length = 500)
@@ -54,6 +57,7 @@ public class User extends BaseEntity {
     private String coverUrl;
 
     @Column(length = 100)
+    @Nationalized
     private String city;
 
     @ManyToMany(fetch = FetchType.EAGER)

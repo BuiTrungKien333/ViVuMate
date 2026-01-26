@@ -1,4 +1,4 @@
 package com.vivumate.coreapi.service;
 
-public class UserService {
+public interface UserService {
 }
