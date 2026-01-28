@@ -29,6 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final Translator translator;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain) throws ServletException, IOException {
@@ -51,7 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String body = String.format(
                     "{\"code\": %d, \"message\": \"%s\"}",
                     errorCode.getCode(),
-                    Translator.toLocale(errorCode.getMessageKey())
+                    translator.toLocale(errorCode.getMessageKey())
             );
 
             response.getWriter().write(body);

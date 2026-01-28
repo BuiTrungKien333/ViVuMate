@@ -1,22 +1,21 @@
 package com.vivumate.coreapi.utils;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
-import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class Translator {
 
-    private static ResourceBundleMessageSource messageSource;
+    private final MessageSource messageSource;
 
-    @Autowired
-    public Translator(ResourceBundleMessageSource messageSource) {
-        Translator.messageSource = messageSource;
+    public String toLocale(String msgCode) {
+        return messageSource.getMessage(
+                msgCode,
+                null,
+                LocaleContextHolder.getLocale()
+        );
     }
-
-    public static String toLocale(String msgCode) {
-        return messageSource.getMessage(msgCode, null, LocaleContextHolder.getLocale());
-    }
-
 }
