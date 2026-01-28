@@ -4,6 +4,7 @@ import com.vivumate.coreapi.dto.response.ApiResponse;
 import com.vivumate.coreapi.utils.Translator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -20,7 +21,10 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Slf4j
+@RequiredArgsConstructor
 public class GlobalExceptionHandler {
+
+    private final Translator translator;
 
     /*
      * Business Exception
@@ -53,7 +57,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMissingParams(MissingServletRequestParameterException e) {
         log.warn("Missing request parameter: {}", e.getParameterName());
 
-        String message = Translator.toLocale("error.param.missing") + ": " + e.getParameterName();
+        String message = translator.toLocale("error.param.missing") + ": " + e.getParameterName();
 
         return ResponseEntity.badRequest().body(
                 ApiResponse.error(ErrorCode.INVALID_INPUT.getCode(), message)
@@ -64,7 +68,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
         log.warn("Parameter type Mismatch: param={}, value={}", e.getName(), e.getValue());
 
-        String message = Translator.toLocale("error.param.type") + ": " + e.getName();
+        String message = translator.toLocale("error.param.type") + ": " + e.getName();
 
         return ResponseEntity.badRequest().body(
                 ApiResponse.error(ErrorCode.INVALID_INPUT.getCode(), message)
@@ -137,7 +141,7 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ApiResponse<Void>> buildErrorResponse(ErrorCode errorCode) {
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(ApiResponse.error(errorCode.getCode(), Translator.toLocale(errorCode.getMessageKey())));
+                .body(ApiResponse.error(errorCode.getCode(), translator.toLocale(errorCode.getMessageKey())));
     }
 
 }

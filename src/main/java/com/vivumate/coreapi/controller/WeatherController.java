@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class WeatherController {
 
     private final WeatherService weatherService;
+    private final Translator translator;
 
     @Operation(summary = "Get current weather", description = "API to retrieve current weather information by latitude and longitude")
     @GetMapping("/current")
@@ -46,7 +47,7 @@ public class WeatherController {
 
         return ApiResponse.<WeatherResponse>builder()
                 .code(200)
-                .message(Translator.toLocale("success.weather.get"))
+                .message(translator.toLocale("success.weather.get"))
                 .data(data)
                 .build();
     }
