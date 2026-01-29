@@ -50,10 +50,10 @@ public class User extends BaseEntity {
     @Nationalized
     private String bio;
 
-    @Column(length = 500)
+    @Column(length = 255)
     private String avatarUrl;
 
-    @Column(length = 500)
+    @Column(length = 255)
     private String coverUrl;
 
     @Column(length = 100)

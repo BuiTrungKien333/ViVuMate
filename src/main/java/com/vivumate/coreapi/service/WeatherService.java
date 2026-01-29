@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 @Service
-@Slf4j(topic = "WEATHER-SERVICE")
+@Slf4j(topic = "WEATHER_SERVICE")
 @RequiredArgsConstructor
 public class WeatherService {
 

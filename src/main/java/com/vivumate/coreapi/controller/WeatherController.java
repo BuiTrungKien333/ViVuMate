@@ -20,13 +20,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Validated
 @Slf4j
-@Tag(name = "Weather Controller")
+@Tag(name = "WEATHER_CONTROLLER")
+@Tag(
+        name = "Weather",
+        description = "APIs for retrieving real-time weather information based on geographic coordinates."
+)
 public class WeatherController {
 
     private final WeatherService weatherService;
     private final Translator translator;
 
-    @Operation(summary = "Get current weather", description = "API to retrieve current weather information by latitude and longitude")
+    @Operation(
+            summary = "Get Current Weather",
+            description = "Retrieve the current weather data using latitude and longitude coordinates. " +
+                    "This endpoint returns temperature, city name, and other related weather information."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Weather information retrieved successfully"
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "400",
+            description = "Invalid latitude or longitude value"
+    )
     @GetMapping("/current")
     public ApiResponse<WeatherResponse> getWeather(@RequestParam("lat")
                                                    @NotNull(message = "{weather.latitude.notNull}")

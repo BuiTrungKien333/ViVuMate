@@ -97,6 +97,9 @@ vivumate:
     reset:
       expiration: 900000      # 15 phút
 
+  openapi:
+    dev-url: http://localhost:8080
+
 ---
 management:
   endpoints:

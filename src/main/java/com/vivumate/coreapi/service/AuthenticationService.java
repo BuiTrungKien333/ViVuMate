@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j(topic = "AUTHENTICATION-SERVICE")
+@Slf4j(topic = "AUTHENTICATION_SERVICE")
 public class AuthenticationService {
 
     private final AuthenticationManager authenticationManager;
