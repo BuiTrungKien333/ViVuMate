@@ -9,6 +9,7 @@ import org.springframework.cache.annotation.EnableCaching;
 public class ViVuMateApplication {
 
 	public static void main(String[] args) {
+		System.out.println("Hello World");
 		SpringApplication.run(ViVuMateApplication.class, args);
 	}
 

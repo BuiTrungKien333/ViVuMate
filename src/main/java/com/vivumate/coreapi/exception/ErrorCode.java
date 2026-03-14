@@ -22,6 +22,14 @@ public enum ErrorCode {
     TOKEN_EXPIRED(1008, "error.token.expired", HttpStatus.UNAUTHORIZED),
     ACCOUNT_DELETED(1009, "error.account.deleted", HttpStatus.FORBIDDEN),
     TOKEN_REVOKED(1010, "error.token.revoked", HttpStatus.UNAUTHORIZED),
+    USER_NOT_FOUND(1011, "error.user.notfound", HttpStatus.NOT_FOUND),
+    OLD_PASSWORD_INCORRECT(1012, "error.user.password.incorrect", HttpStatus.BAD_REQUEST),
+    PASSWORDS_DO_NOT_MATCH(1013, "error.user.password.notmatch", HttpStatus.BAD_REQUEST),
+    USER_EXISTED(1014, "error.user.existed", HttpStatus.CONFLICT),
+    EMAIL_EXISTED(1015, "error.user.email.existed", HttpStatus.CONFLICT),
+    ROLE_NOT_FOUND(1016, "error.user.role.notfound", HttpStatus.NOT_FOUND),
+    USER_NOT_DELETED(1017, "error.user.notdelete", HttpStatus.BAD_REQUEST),
+    ENDPOINT_NOT_FOUND(1018, "error.endpoint.notfound", HttpStatus.NOT_FOUND),
 
     WEATHER_API_ERROR(2001, "error.weather.api", HttpStatus.BAD_GATEWAY),
     WEATHER_DATA_PARSE_ERROR(2002, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR);

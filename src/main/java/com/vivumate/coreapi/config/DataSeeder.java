@@ -94,7 +94,7 @@ public class DataSeeder implements CommandLineRunner {
                 .roles(new HashSet<>(Set.of(adminRole)))
                 .status(UserStatus.ACTIVE)
                 .provider(AuthProvider.LOCAL)
-                .isVerified(true)
+                .verified(true)
                 .build();
 
         // Standard User
@@ -106,7 +106,7 @@ public class DataSeeder implements CommandLineRunner {
                 .roles(new HashSet<>(Set.of(userRole)))
                 .status(UserStatus.ACTIVE)
                 .provider(AuthProvider.LOCAL)
-                .isVerified(false)
+                .verified(false)
                 .build();
 
         userRepository.saveAll(List.of(admin, user));

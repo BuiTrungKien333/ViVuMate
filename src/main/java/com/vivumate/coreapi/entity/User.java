@@ -8,8 +8,12 @@ import lombok.*;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -18,49 +22,44 @@ import java.util.Set;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
+@ToString(exclude = {"password", "roles"})
 @Entity
 @Table(name = "tbl_users")
 @SQLDelete(sql = "update tbl_users set deleted_at = NOW() where id = ?")
 @SQLRestriction("deleted_at is null")
-public class User extends BaseEntity {
+public class User extends BaseEntity implements UserDetails {
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "email", nullable = false, unique = true, length = 100)
     private String email;
 
-    @Column(length = 255)
+    @Column(name = "password", length = 255)
     private String password;
 
-    @Column(unique = true, length = 15)
-    private String phone;
-
-    @Column(nullable = false, length = 100)
+    @Column(name = "full_name", nullable = false, length = 100)
     @Nationalized
     private String fullName;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "gender")
     private Gender gender;
 
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(length = 500)
+    @Column(name = "bio", length = 500)
     @Nationalized
     private String bio;
 
-    @Column(length = 255)
+    @Column(name = "avatar_url", length = 255)
     private String avatarUrl;
 
-    @Column(length = 255)
+    @Column(name = "cover_url", length = 255)
     private String coverUrl;
 
-    @Column(length = 100)
-    @Nationalized
-    private String city;
-
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "tbl_users_roles",
             joinColumns = @JoinColumn(name = "user_id"),
@@ -69,17 +68,55 @@ public class User extends BaseEntity {
     private Set<Role> roles = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status", nullable = false)
     private UserStatus status;
 
     @Column(name = "is_verified")
-    private boolean isVerified = false;
+    private boolean verified = false;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "provider", nullable = false)
     private AuthProvider provider;
 
     @Column(name = "provider_id")
     private String providerId;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @Column(name = "is_online", nullable = false, columnDefinition = "boolean default false")
+    private boolean online;
+
+    @Column(name = "last_seen")
+    private LocalDateTime lastSeen;
+
+    // === UserDetails implementation ===
+    @Transient
+    private Set<GrantedAuthority> authorities;
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return authorities;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return status != UserStatus.BANNED;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return deletedAt == null && status != UserStatus.INACTIVE;
+    }
 
 }

@@ -28,5 +28,4 @@ public class AuthenticationResponse {
     private Long userId;
     private String username;
     private Set<String> roles;
-
 }

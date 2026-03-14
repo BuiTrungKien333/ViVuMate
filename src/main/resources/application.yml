@@ -3,104 +3,53 @@ server:
   servlet:
     encoding:
       charset: UTF-8
-      force: true
       enabled: true
+      force: true
 
 spring:
+  output:
+    ansi:
+      enabled: always
+
   application:
     name: ViVuMate
 
-  messages:
-    encoding: UTF-8
-    basename: i18n/messages
-
   profiles:
     active: dev
+
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
 
   docker:
     compose:
       enabled: false
       file: docker-compose.yml
 
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-  datasource:
-    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB:vivumate_db}
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD:123456}
-    driver-class-name: org.postgresql.Driver
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-      format_sql: true
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-
-  data:
-    mongodb:
-      uri: mongodb://${MONGO_USER:admin}:${MONGO_PASSWORD:123456}@localhost:${MONGO_PORT:27017}/${MONGO_DB:vivumate_chat}?authSource=admin
-
-    redis:
-      host: localhost
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:123456}
----
-spring:
-  config:
-    activate:
-      on-profile: docker
-
-  datasource:
-    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
-    username: ${POSTGRES_USER}
-    password: ${POSTGRES_PASSWORD}
-
-  data:
-    mongodb:
-      uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/${MONGO_DB}?authSource=admin
-
-    redis:
-      host: redis
-      port: 6379
-      password: ${REDIS_PASSWORD}
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
----
 vivumate:
   weather:
     api-key: ${OPENWEATHER_API_KEY}
     base-url: https://api.openweathermap.org/data/2.5/weather
 
   jwt:
-    secret-key: ${JWT_SECRET_KEY} # Access Token
-    refreshKey: ${JWT_REFRESH_KEY} # Refresh Token
-    resetKey: ${JWT_RESET_KEY} # Reset Token
+    secret-key: ${JWT_SECRET_KEY}
+    refreshKey: ${JWT_REFRESH_KEY}
+    resetKey: ${JWT_RESET_KEY}
+
     access:
-      expiration: 3600000     # 1 giờ
+      expiration: 1800000 # 30 phút
     refresh:
-      expiration: 604800000   # 7 ngày
+      expiration: 604800000 # 7 ngày
     reset:
-      expiration: 900000      # 15 phút
+      expiration: 900000 # 15 phút
 
   openapi:
     dev-url: http://localhost:8080
 
----
 management:
   endpoints:
     web:
@@ -112,9 +61,3 @@ management:
       show-details: always
       probes:
         enabled: true
-
----
-logging:
-  level:
-    org.springframework.security: DEBUG
-

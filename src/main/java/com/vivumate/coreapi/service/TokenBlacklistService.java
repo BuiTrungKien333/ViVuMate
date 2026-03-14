@@ -19,13 +19,10 @@ public class TokenBlacklistService {
     private static final String BLACKLIST_PREFIX = "BLACKLIST_TOKEN:";
 
     public void blacklistToken(String token) {
-        // Lấy thời gian hết hạn của Token
         Date expiryDate = jwtUtils.extractClaim(token, TokenType.ACCESS_TOKEN, io.jsonwebtoken.Claims::getExpiration);
 
-        // Tính thời gian còn lại (TTL) = Hết hạn - Hiện tại
         long ttlInMillis = expiryDate.getTime() - System.currentTimeMillis();
 
-        // Nếu token còn sống thì mới lưu vào Redis
         if (ttlInMillis > 0) {
             redisTemplate.opsForValue().set(
                     BLACKLIST_PREFIX + token,
