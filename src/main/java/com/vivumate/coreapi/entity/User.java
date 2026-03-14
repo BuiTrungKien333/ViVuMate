@@ -8,9 +8,12 @@ import lombok.*;
 import org.hibernate.annotations.Nationalized;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -24,7 +27,7 @@ import java.util.Set;
 @Table(name = "tbl_users")
 @SQLDelete(sql = "update tbl_users set deleted_at = NOW() where id = ?")
 @SQLRestriction("deleted_at is null")
-public class User extends BaseEntity {
+public class User extends BaseEntity implements UserDetails {
 
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
@@ -81,8 +84,39 @@ public class User extends BaseEntity {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "is_online", nullable = false, columnDefinition = "boolean default false")
     private boolean online;
 
+    @Column(name = "last_seen")
     private LocalDateTime lastSeen;
+
+    // === UserDetails implementation ===
+    @Transient
+    private Set<GrantedAuthority> authorities;
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return authorities;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return status != UserStatus.BANNED;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return deletedAt == null && status != UserStatus.INACTIVE;
+    }
 
 }

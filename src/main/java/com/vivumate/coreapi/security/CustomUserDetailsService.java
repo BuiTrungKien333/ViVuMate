@@ -27,10 +27,11 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     @Transactional
-    public UserDetails loadUserByUsername(String username) {
-        User user = userRepository.findByUsername(username)
+    public UserDetails loadUserByUsername(String identifier) {
+        User user = userRepository.findByUsernameOrEmail(identifier, identifier)
                 .orElseThrow(() -> new UsernameNotFoundException("USER_NOT_FOUND"));
 
+        String username = user.getUsername();
         if (user.getDeletedAt() != null) {
             log.warn("Deleted user tried to login: {}", username);
             throw new DisabledException("ACCOUNT_DELETED");
@@ -56,10 +57,8 @@ public class CustomUserDetailsService implements UserDetailsService {
             );
         });
 
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(),
-                user.getPassword(),
-                authorities
-        );
+        user.setAuthorities(authorities);
+
+        return user;
     }
 }

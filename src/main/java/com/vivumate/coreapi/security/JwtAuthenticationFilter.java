@@ -1,9 +1,11 @@
 package com.vivumate.coreapi.security;
 
+import com.vivumate.coreapi.entity.User;
 import com.vivumate.coreapi.enums.TokenType;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.service.TokenBlacklistService;
 import com.vivumate.coreapi.utils.Translator;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,14 +14,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -27,7 +32,6 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
-    private final UserDetailsService userDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
     private final Translator translator;
 
@@ -59,10 +63,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        final String username;
+        final Claims claims;
         try {
-            username = jwtUtils.extractUsername(jwt, TokenType.ACCESS_TOKEN);
-            log.debug("[JWT] Token parsed successfully. Username={}, URI={}", username, requestUri);
+            claims = jwtUtils.extractAllClaims(jwt, TokenType.ACCESS_TOKEN);
+            log.debug("[JWT] Token parsed successfully. Username={}, URI={}", claims.getSubject(), requestUri);
         } catch (Exception e) {
             log.warn("[JWT] Invalid or expired token. URI={}, reason={}", requestUri, e.getMessage());
             filterChain.doFilter(request, response);
@@ -76,22 +80,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            String username = claims.getSubject();
+            Long userId = claims.get("userId", Long.class);
 
-            if (jwtUtils.isTokenValid(jwt, userDetails, TokenType.ACCESS_TOKEN)) {
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+            @SuppressWarnings("unchecked")
+            List<String> authorityStrings = claims.get("authorities", List.class);
 
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            Set<GrantedAuthority> authorities = authorityStrings.stream()
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toSet());
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            User user = new User();
+            user.setId(userId);
+            user.setUsername(username);
+            user.setAuthorities(authorities);
 
-                log.info("[JWT] Authentication success. Username={}, URI={}", username, requestUri);
-            } else {
-                log.warn("[JWT] Token validation failed. Username={}, URI={}", username, requestUri);
-            }
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(user, null, authorities);
 
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            log.info("[JWT] Authentication success. Username={}, URI={}", username, requestUri);
         } catch (Exception e) {
-            log.error("[JWT] Authentication process failed. Username={}, URI={}", username, requestUri, e);
+            log.error("[JWT] Authentication process failed. URI={}", requestUri, e);
         }
 
         filterChain.doFilter(request, response);

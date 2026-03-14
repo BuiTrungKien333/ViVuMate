@@ -19,7 +19,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,9 +32,9 @@ public class AuthenticationService {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final JwtUtils jwtUtils;
-    private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UserRepository userRepository;
 
     @Value("${vivumate.jwt.access.expiration}")
     private long accessExpiration;
@@ -41,22 +43,25 @@ public class AuthenticationService {
     private long refreshTokenExpiration;
 
     // --- LOGIN ---
+    @Transactional
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
-        log.info("(Attempt) Login user: {}", request.getUsername());
+        log.info("(Attempt) Login user: {}", request.getIdentifier());
 
-        authenticationManager.authenticate(
+        var authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getUsername(), request.getPassword()));
+                        request.getIdentifier(), request.getPassword()));
 
-        var userDetails = userDetailsService.loadUserByUsername(request.getUsername());
+        var user = (User) authentication.getPrincipal();
 
-        var user = userRepository.findByUsername(request.getUsername()).orElseThrow();
+        user.setLastLoginAt(LocalDateTime.now());
+        user.setOnline(true);
+        userRepository.save(user);
 
-        String accessToken = jwtUtils.generateToken(userDetails);
-        String refreshToken = jwtUtils.generateRefreshToken(userDetails);
+        String accessToken = jwtUtils.generateToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
 
-        saveUserRefreshTokenToDB(user, refreshToken);
-        log.info("(Success) Login user: {}", request.getUsername());
+        saveUserRefreshTokenToDb(user, refreshToken);
+        log.info("(Success) Login user: {}", request.getIdentifier());
 
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
@@ -96,7 +101,7 @@ public class AuthenticationService {
         String newAccessToken = jwtUtils.generateToken(userDetails);
         String newRefreshToken = jwtUtils.generateRefreshToken(userDetails);
 
-        saveUserRefreshTokenToDB(storedToken.getUser(), newRefreshToken);
+        saveUserRefreshTokenToDb((User) userDetails, newRefreshToken);
 
         log.info("(Success) Refreshed token for user: {}", username);
 
@@ -110,12 +115,10 @@ public class AuthenticationService {
     }
 
     // --- LOG OUT ---
+    @Transactional
     public void logout(String accessToken, String refreshToken) {
         log.info("(Attempt) Logout");
-        if (accessToken.startsWith("Bearer ")) {
-            accessToken = accessToken.substring(7);
-        }
-        tokenBlacklistService.blacklistToken(accessToken);
+        tokenBlacklistService.blacklistToken(accessToken.substring(7));
 
         var storedRefreshToken = refreshTokenRepository.findByToken(refreshToken)
                 .orElse(null);
@@ -123,16 +126,22 @@ public class AuthenticationService {
         if (storedRefreshToken != null) {
             storedRefreshToken.setRevoked(true);
             refreshTokenRepository.save(storedRefreshToken);
+
+            User user = storedRefreshToken.getUser();
+            user.setOnline(false);
+            user.setLastSeen(LocalDateTime.now());
+            userRepository.save(user);
         }
     }
 
-    private void saveUserRefreshTokenToDB(User user, String jwtToken) {
+    private void saveUserRefreshTokenToDb(User user, String jwtToken) {
         var token = RefreshToken.builder()
                 .user(user)
                 .token(jwtToken)
                 .revoked(false)
                 .expiryDate(java.time.Instant.now().plusMillis(refreshTokenExpiration))
                 .build();
+
         refreshTokenRepository.save(token);
     }
 }

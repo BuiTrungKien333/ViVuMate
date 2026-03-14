@@ -28,29 +28,18 @@ public class AuthenticationController {
 
     private final AuthenticationService authenticationService;
 
-    @Operation(
-            summary = "User Login",
-            description = "Validates username and password, then returns an Access Token and Refresh Token. " +
-                    "The Access Token is required to access protected endpoints."
-    )
+    @Operation(summary = "User Login", description = "Validates username and password, then returns an Access Token and Refresh Token. "
+            +
+            "The Access Token is required to access protected endpoints.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "1004",
-            description = "Invalid username or password",
-            content = @Content
-    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1004", description = "Invalid username or password", content = @Content)
     @PostMapping("/login")
     public ApiResponse<AuthenticationResponse> login(@RequestBody @Valid AuthenticationRequest request) {
-        log.info("Login request received for username={}", request.getUsername());
+        log.info("Login request received for identifier={}", request.getIdentifier());
         return ApiResponse.success(authenticationService.authenticate(request));
     }
 
-
-    @Operation(
-            summary = "Refresh Access Token",
-            description = "When the Access Token expires, use the Refresh Token to obtain a new pair of tokens " +
-                    "without requiring the user to log in again."
-    )
+    @Operation(summary = "Refresh Access Token", description = "When the Access Token expires, use the Refresh Token to obtain a new pair of tokens without requiring the user to log in again.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token refreshed successfully")
     @PostMapping("/refresh-token")
     public ApiResponse<AuthenticationResponse> refreshToken(@RequestBody @Valid RefreshTokenRequest request) {
@@ -58,15 +47,13 @@ public class AuthenticationController {
         return ApiResponse.success(authenticationService.refreshToken(request));
     }
 
-
-    @Operation(
-            summary = "User Logout",
-            description = "Revokes the Refresh Token and adds the current Access Token to the blacklist, " +
-                    "preventing further usage."
-    )
+    @Operation(summary = "User Logout", description = "Revokes the Refresh Token and adds the current Access Token to the blacklist, "
+            +
+            "preventing further usage.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Logout successful")
     @PostMapping("/logout")
-    public ApiResponse<String> logout(HttpServletRequest request, @RequestBody RefreshTokenRequest refreshTokenRequest) {
+    public ApiResponse<String> logout(HttpServletRequest request,
+                                      @RequestBody RefreshTokenRequest refreshTokenRequest) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new AppException(ErrorCode.TOKEN_INVALID);

@@ -13,9 +13,6 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Builder
 public class UserCreationRequest {
-    @NotBlank(message = "Username is required")
-    @Size(min = 4, max = 50, message = "Username must be between 4 and 50 characters.")
-    private String username;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Email format is invalid")

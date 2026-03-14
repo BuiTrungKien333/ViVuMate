@@ -11,6 +11,8 @@ import java.util.List;
 public interface UserService {
 
     // User (self)
+    UserResponse createUser(UserCreationRequest request);
+
     UserResponse getMyProfile();
 
     UserResponse updateMyProfile(UserUpdateRequest request);
@@ -34,8 +36,6 @@ public interface UserService {
 
     // Admin
     PageResponse<UserResponse> getAllUsers(int page, int size);
-
-    UserResponse createUser(UserCreationRequest request);
 
     UserResponse updateUser(Long id, UserUpdateRequest request);
 

@@ -1,5 +1,6 @@
 package com.vivumate.coreapi.security;
 
+import com.vivumate.coreapi.entity.User;
 import com.vivumate.coreapi.enums.TokenType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -8,6 +9,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -42,7 +44,16 @@ public class JwtUtils {
 
     // --- GENERATE TOKEN ---
     public String generateToken(UserDetails userDetails) {
-        return buildToken(new HashMap<>(), userDetails, TokenType.ACCESS_TOKEN, jwtExpiration);
+        Map<String, Object> extraClaims = new HashMap<>();
+
+        if (userDetails instanceof User user) {
+            extraClaims.put("userId", user.getId());
+            extraClaims.put("authorities", user.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .toList());
+        }
+
+        return buildToken(extraClaims, userDetails, TokenType.ACCESS_TOKEN, jwtExpiration);
     }
 
     public String generateRefreshToken(UserDetails userDetails) {
@@ -75,26 +86,26 @@ public class JwtUtils {
         }
     }
 
+    private boolean isTokenExpired(String token, TokenType type) {
+        return extractClaim(token, type, Claims::getExpiration).before(new Date());
+    }
+
     // --- EXTRACT DATA ---
     public String extractUsername(String token, TokenType type) {
         return extractClaim(token, type, Claims::getSubject);
     }
 
-    private boolean isTokenExpired(String token, TokenType type) {
-        return extractClaim(token, type, Claims::getExpiration).before(new Date());
-    }
-
-    public <T> T extractClaim(String token, TokenType type, Function<Claims, T> claimsResolver) {
-        final Claims claims = extractAllClaims(token, type);
-        return claimsResolver.apply(claims);
-    }
-
-    private Claims extractAllClaims(String token, TokenType type) {
+    public Claims extractAllClaims(String token, TokenType type) {
         return Jwts.parser()
                 .verifyWith(getSignInKey(type))
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public <T> T extractClaim(String token, TokenType type, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token, type);
+        return claimsResolver.apply(claims);
     }
 
     // --- GET KEY HELPER ---

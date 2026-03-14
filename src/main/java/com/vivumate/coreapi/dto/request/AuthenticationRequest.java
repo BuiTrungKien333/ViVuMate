@@ -11,9 +11,9 @@ import lombok.*;
 @ToString
 public class AuthenticationRequest {
 
-    @Schema(description = "Username", example = "admin")
-    @NotBlank(message = "Username cannot be blank")
-    private String username;
+    @Schema(description = "Username or Email", example = "admin or admin@gmail.com")
+    @NotBlank(message = "Username or Email cannot be blank")
+    private String identifier;
 
     @Schema(description = "Password", example = "admin123")
     @NotBlank(message = "Password cannot be blank")

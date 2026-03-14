@@ -23,9 +23,9 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("ViVuMate Core API")
                         .version("1.0.0")
-                        .description("Standard API documentation for the ViVuMate application. Full support for Authentication, RBAC, and Travel Management features.")
+                        .description("Standard API documentation for the ViVuMate application.")
                         .license(new License().name("Apache 2.0").url("https://www.apache.org/licenses/LICENSE-2.0"))
-                        .contact(new Contact().name("ViVuMate Team").email("buitrungkien2005qng@gmail.com")))
+                        .contact(new Contact().name("Bui Trung Kien").email("buitrungkien2005qng@gmail.com")))
                 .servers(List.of(
                         new Server().url(devUrl).description("Development Environment Server"),
                         new Server().url("https://api.vivumate.com").description("Production Environment Server")

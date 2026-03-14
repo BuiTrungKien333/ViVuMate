@@ -41,7 +41,7 @@ public abstract class BaseEntity {
     private String lastModifiedBy;
 
     @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    protected LocalDateTime deletedAt;
 
     @Override
     public final boolean equals(Object o) {
