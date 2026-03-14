@@ -1,10 +1,10 @@
 package com.vivumate.coreapi.controller;
 
 import com.vivumate.coreapi.dto.request.ChangePasswordRequest;
-import com.vivumate.coreapi.dto.request.UserCreationRequest;
 import com.vivumate.coreapi.dto.request.UserUpdateRequest;
 import com.vivumate.coreapi.dto.response.ApiResponse;
 import com.vivumate.coreapi.dto.response.PageResponse;
+import com.vivumate.coreapi.dto.response.UserMiniResponse;
 import com.vivumate.coreapi.dto.response.UserResponse;
 import com.vivumate.coreapi.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +15,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -97,10 +96,10 @@ public class UserController {
         return ApiResponse.success(userService.getUserByUsername(username));
     }
 
-    @Operation(summary = "Search users", description = "Searches users by keyword (username, full name, or email) with pagination.")
+    @Operation(summary = "Search users", description = "Searches users by keyword (username, full name) with pagination.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Search results returned")
     @GetMapping("/search")
-    public ApiResponse<PageResponse<UserResponse>> searchUsers(
+    public ApiResponse<PageResponse<UserMiniResponse>> searchUsers(
             @Parameter(description = "Search keyword") @RequestParam String keyword,
             @Parameter(description = "Page number (1-based)") @RequestParam(defaultValue = "1") @Min(1) int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "10") @Min(1) int size) {
@@ -110,8 +109,8 @@ public class UserController {
 
     @Operation(summary = "Get users by IDs (batch)", description = "Returns a list of users matching the provided IDs. Useful for batch lookups.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Users returned")
-    @PostMapping("/batch")
-    public ApiResponse<List<UserResponse>> getUsersByIds(@RequestBody List<Long> ids) {
+    @GetMapping("/batch")
+    public ApiResponse<List<UserMiniResponse>> getUsersByIds(@RequestBody List<Long> ids) {
         log.info("Get users by IDs, count: {}", ids.size());
         return ApiResponse.success(userService.getUsersByIds(ids));
     }
@@ -128,16 +127,6 @@ public class UserController {
             @Parameter(description = "Page size") @RequestParam(defaultValue = "10") @Min(1) int size) {
         log.info("Admin: Get all users, page={}, size={}", page, size);
         return ApiResponse.success(userService.getAllUsers(page, size));
-    }
-
-    @Operation(summary = "Create user (Admin)", description = "Creates a new user account. Requires ADMIN role.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "User created successfully")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already exists", content = @Content)
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<UserResponse> createUser(@RequestBody @Valid UserCreationRequest request) {
-        log.info("Create user with email={}", request.getEmail());
-        return ApiResponse.success(userService.createUser(request));
     }
 
     @Operation(summary = "Update user (Admin)", description = "Updates a user's profile information by ID. Requires ADMIN role.")
@@ -161,6 +150,7 @@ public class UserController {
             @Parameter(description = "User ID") @PathVariable Long id) {
         log.info("Admin: Delete user id={}", id);
         userService.deleteUser(id);
+
         return ApiResponse.success("User deleted successfully");
     }
 

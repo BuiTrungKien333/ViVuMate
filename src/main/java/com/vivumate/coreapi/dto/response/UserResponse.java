@@ -9,7 +9,6 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
 
 @Getter
 @Setter
@@ -40,8 +39,6 @@ public class UserResponse {
 
     @JsonProperty("cover_url")
     private String coverUrl;
-
-    private Set<String> roles;
 
     private UserStatus status;
 

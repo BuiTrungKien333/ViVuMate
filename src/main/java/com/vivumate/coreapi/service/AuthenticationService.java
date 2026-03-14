@@ -2,14 +2,19 @@ package com.vivumate.coreapi.service;
 
 import com.vivumate.coreapi.dto.request.AuthenticationRequest;
 import com.vivumate.coreapi.dto.request.RefreshTokenRequest;
+import com.vivumate.coreapi.dto.request.UserCreationRequest;
 import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.entity.RefreshToken;
 import com.vivumate.coreapi.entity.Role;
 import com.vivumate.coreapi.entity.User;
+import com.vivumate.coreapi.enums.AuthProvider;
 import com.vivumate.coreapi.enums.TokenType;
+import com.vivumate.coreapi.enums.UserStatus;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
+import com.vivumate.coreapi.mapper.UserMapper;
 import com.vivumate.coreapi.repository.RefreshTokenRepository;
+import com.vivumate.coreapi.repository.RoleRepository;
 import com.vivumate.coreapi.repository.UserRepository;
 import com.vivumate.coreapi.security.JwtUtils;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,12 +41,67 @@ public class AuthenticationService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final TokenBlacklistService tokenBlacklistService;
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${vivumate.jwt.access.expiration}")
     private long accessExpiration;
 
     @Value("${vivumate.jwt.refresh.expiration}")
     private long refreshTokenExpiration;
+
+    // --- REGISTER ---
+    @Transactional
+    public AuthenticationResponse register(UserCreationRequest request) {
+        log.info("(Attempt) Register user: {}", request.getEmail());
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_EXISTED);
+        }
+
+        Role defaultRole = roleRepository.findByName("USER")
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
+
+        String baseUsername = request.getEmail().substring(0, request.getEmail().indexOf("@"));
+        String username = baseUsername;
+        while (userRepository.existsByUsername(username)) {
+            int suffix = java.util.concurrent.ThreadLocalRandom.current().nextInt(10000);
+            username = baseUsername + "_" + String.format("%04d", suffix);
+        }
+
+        User user = User.builder()
+                .username(username)
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .fullName(request.getFullName())
+                .gender(request.getGender())
+                .dateOfBirth(request.getDateOfBirth())
+                .status(UserStatus.ACTIVE)
+                .roles(java.util.Set.of(defaultRole))
+                .provider(AuthProvider.LOCAL)
+                .verified(false)
+                .online(true)
+                .lastLoginAt(LocalDateTime.now())
+                .build();
+
+        User savedUser = userRepository.save(user);
+        log.info("(Success) Register user: {} (username={})", savedUser.getEmail(), savedUser.getUsername());
+
+        savedUser.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
+
+        String accessToken = jwtUtils.generateToken(savedUser);
+        String refreshToken = jwtUtils.generateRefreshToken(savedUser);
+        saveUserRefreshTokenToDb(savedUser, refreshToken);
+
+        return AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(accessExpiration)
+                .userId(savedUser.getId())
+                .username(savedUser.getUsername())
+                .roles(savedUser.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
+                .build();
+    }
 
     // --- LOGIN ---
     @Transactional

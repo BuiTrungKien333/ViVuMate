@@ -1,9 +1,9 @@
 package com.vivumate.coreapi.service;
 
 import com.vivumate.coreapi.dto.request.ChangePasswordRequest;
-import com.vivumate.coreapi.dto.request.UserCreationRequest;
 import com.vivumate.coreapi.dto.request.UserUpdateRequest;
 import com.vivumate.coreapi.dto.response.PageResponse;
+import com.vivumate.coreapi.dto.response.UserMiniResponse;
 import com.vivumate.coreapi.dto.response.UserResponse;
 
 import java.util.List;
@@ -11,8 +11,6 @@ import java.util.List;
 public interface UserService {
 
     // User (self)
-    UserResponse createUser(UserCreationRequest request);
-
     UserResponse getMyProfile();
 
     UserResponse updateMyProfile(UserUpdateRequest request);
@@ -28,9 +26,9 @@ public interface UserService {
 
     UserResponse getUserByUsername(String username);
 
-    PageResponse<UserResponse> searchUsers(String keyword, int page, int size);
+    PageResponse<UserMiniResponse> searchUsers(String keyword, int page, int size);
 
-    List<UserResponse> getUsersByIds(List<Long> ids);
+    List<UserMiniResponse> getUsersByIds(List<Long> ids);
 
     void updateOnlineStatus(Long userId, boolean online);
 

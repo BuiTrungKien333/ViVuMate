@@ -1,13 +1,11 @@
 package com.vivumate.coreapi.service.impl;
 
 import com.vivumate.coreapi.dto.request.ChangePasswordRequest;
-import com.vivumate.coreapi.dto.request.UserCreationRequest;
 import com.vivumate.coreapi.dto.request.UserUpdateRequest;
 import com.vivumate.coreapi.dto.response.PageResponse;
+import com.vivumate.coreapi.dto.response.UserMiniResponse;
 import com.vivumate.coreapi.dto.response.UserResponse;
-import com.vivumate.coreapi.entity.Role;
 import com.vivumate.coreapi.entity.User;
-import com.vivumate.coreapi.enums.AuthProvider;
 import com.vivumate.coreapi.enums.UserStatus;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
@@ -28,8 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
@@ -77,21 +73,28 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public PageResponse<UserResponse> searchUsers(String keyword, int page, int size) {
-        return null;
+    public PageResponse<UserMiniResponse> searchUsers(String keyword, int page, int size) {
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<UserMiniResponse> userPage = userRepository.searchByKeyword(keyword == null ? "" : keyword.trim().toLowerCase(), pageable);
+
+        return PageResponse.<UserMiniResponse>builder()
+                .currentPage(page)
+                .pageSize(size)
+                .totalPage(userPage.getTotalPages())
+                .totalElements(userPage.getTotalElements())
+                .data(userPage.getContent())
+                .build();
     }
 
     @Override
-    public List<UserResponse> getUsersByIds(List<Long> ids) {
-        List<User> users = userRepository.findAllById(ids);
+    public List<UserMiniResponse> getUsersByIds(List<Long> ids) {
+        List<UserMiniResponse> users = userRepository.findChatMembersByIds(ids);
 
         if (users.size() != ids.size()) {
             log.warn("Some user IDs not found. Requested: {}, Found: {}", ids.size(), users.size());
         }
 
-        return users.stream()
-                .map(UserMapper::toUserResponse)
-                .toList();
+        return users;
     }
 
     @Override
@@ -113,49 +116,6 @@ public class UserServiceImpl implements UserService {
     }
 
     // ======= WRITE =======
-    private String generateUniqueUsername(String email) {
-        String baseUsername = email.substring(0, email.indexOf("@"));
-        String username = baseUsername;
-
-        while (userRepository.existsByUsername(username)) {
-            int suffix = ThreadLocalRandom.current().nextInt(10000);
-            username = baseUsername + "_" + String.format("%04d", suffix);
-        }
-        return username;
-    }
-
-    @Transactional
-    @Override
-    public UserResponse createUser(UserCreationRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new AppException(ErrorCode.EMAIL_EXISTED);
-        }
-
-        Role defaultRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
-
-        String username = generateUniqueUsername(request.getEmail());
-
-        User user = User.builder()
-                .username(username)
-                .password(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
-                .email(request.getEmail())
-                .gender(request.getGender())
-                .dateOfBirth(request.getDateOfBirth())
-                .status(UserStatus.ACTIVE)
-                .roles(Set.of(defaultRole))
-                .provider(AuthProvider.LOCAL)
-                .verified(false)
-                .online(false)
-                .build();
-
-        User savedUser = userRepository.save(user);
-        log.info("User created: {}", savedUser.getUsername());
-
-        return UserMapper.toUserResponse(savedUser);
-    }
-
     @Transactional
     @Override
     public UserResponse updateMyProfile(UserUpdateRequest request) {
@@ -264,8 +224,8 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        user.setStatus(UserStatus.INACTIVE);
         userRepository.delete(user);
-        userRepository.save(user);
         log.info("User deleted: {}", user.getUsername());
     }
 

@@ -21,6 +21,10 @@ spring:
     basename: i18n/messages
     encoding: UTF-8
 
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+
   docker:
     compose:
       enabled: false

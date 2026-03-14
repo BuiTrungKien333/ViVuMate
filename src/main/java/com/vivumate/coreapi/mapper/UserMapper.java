@@ -3,9 +3,12 @@ package com.vivumate.coreapi.mapper;
 import com.vivumate.coreapi.dto.response.UserResponse;
 import com.vivumate.coreapi.entity.Role;
 import com.vivumate.coreapi.entity.User;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
-import java.util.stream.Collectors;
+import java.util.HashSet;
+import java.util.Set;
 
 @Component
 public class UserMapper {
@@ -21,9 +24,6 @@ public class UserMapper {
                 .bio(user.getBio())
                 .avatarUrl(user.getAvatarUrl())
                 .coverUrl(user.getCoverUrl())
-                .roles(user.getRoles().stream()
-                        .map(Role::getName)
-                        .collect(Collectors.toSet()))
                 .status(user.getStatus())
                 .verified(user.isVerified())
                 .provider(user.getProvider())
@@ -34,5 +34,16 @@ public class UserMapper {
                 .build();
     }
 
+    public static Set<GrantedAuthority> buildAuthorities(Set<Role> roles) {
+        Set<GrantedAuthority> authorities = new HashSet<>();
+
+        roles.forEach(role -> {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+            role.getPermissions().forEach(permission ->
+                    authorities.add(new SimpleGrantedAuthority(permission.getPermissionCode().name()))
+            );
+        });
+        return authorities;
+    }
 }
 
