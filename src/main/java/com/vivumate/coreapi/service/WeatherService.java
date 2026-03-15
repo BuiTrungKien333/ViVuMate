@@ -34,9 +34,7 @@ public class WeatherService {
             unless = "#result == null"
     )
     public WeatherResponse getCurrentWeather(Double lat, Double lon) {
-
         String langCode = getLanguageCode();
-
         log.info("Fetching weather for lat: {}, lon: {}, lang: {}", lat, lon, langCode);
 
         try {

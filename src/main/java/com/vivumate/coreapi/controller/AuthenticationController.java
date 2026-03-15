@@ -1,13 +1,16 @@
 package com.vivumate.coreapi.controller;
 
 import com.vivumate.coreapi.dto.request.AuthenticationRequest;
+import com.vivumate.coreapi.dto.request.ForgotPasswordRequest;
 import com.vivumate.coreapi.dto.request.RefreshTokenRequest;
+import com.vivumate.coreapi.dto.request.ResetPasswordRequest;
 import com.vivumate.coreapi.dto.request.UserCreationRequest;
 import com.vivumate.coreapi.dto.response.ApiResponse;
 import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.service.AuthenticationService;
+import com.vivumate.coreapi.utils.Translator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthenticationController {
 
     private final AuthenticationService authenticationService;
+    private final Translator translator;
 
     @Operation(summary = "User Login", description = "Validates username and password, then returns an Access Token and Refresh Token. "
             +
@@ -70,7 +74,30 @@ public class AuthenticationController {
         }
 
         authenticationService.logout(authHeader, refreshTokenRequest.getRefreshToken());
-        return ApiResponse.success("Logout successfully!");
+        return ApiResponse.success(translator.toLocale("success.auth.logout"));
+    }
+
+    @Operation(summary = "Forgot Password",
+            description = "Sends a password reset email to the provided email address. "
+                    + "For security, always returns the same response regardless of whether the email exists.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Reset email sent (if email exists)")
+    @PostMapping("/forgot-password")
+    public ApiResponse<String> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
+        log.info("Forgot password request received for email={}", request.getEmail());
+        authenticationService.forgotPassword(request);
+        return ApiResponse.success(translator.toLocale("success.auth.forgot_password"));
+    }
+
+    @Operation(summary = "Reset Password",
+            description = "Resets the user's password using a valid reset token. "
+                    + "After resetting, all existing refresh tokens are revoked, forcing re-authentication on all devices.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password reset successfully")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1007", description = "Invalid or expired reset token", content = @Content)
+    @PostMapping("/reset-password")
+    public ApiResponse<String> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+        log.info("Reset password request received");
+        authenticationService.resetPassword(request);
+        return ApiResponse.success(translator.toLocale("success.auth.reset_password"));
     }
 
 }

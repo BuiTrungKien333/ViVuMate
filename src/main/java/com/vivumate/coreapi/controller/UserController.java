@@ -7,6 +7,7 @@ import com.vivumate.coreapi.dto.response.PageResponse;
 import com.vivumate.coreapi.dto.response.UserMiniResponse;
 import com.vivumate.coreapi.dto.response.UserResponse;
 import com.vivumate.coreapi.service.UserService;
+import com.vivumate.coreapi.utils.Translator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,6 +30,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserService userService;
+    private final Translator translator;
 
     // ==================== USER (SELF) ====================
 
@@ -55,7 +57,7 @@ public class UserController {
     public ApiResponse<String> changePassword(@RequestBody @Valid ChangePasswordRequest request) {
         log.info("Change password request");
         userService.changePassword(request);
-        return ApiResponse.success("Password changed successfully");
+        return ApiResponse.success(translator.toLocale("success.user.password_changed"));
     }
 
     @Operation(summary = "Update avatar", description = "Updates the avatar URL of the currently authenticated user.")
@@ -151,7 +153,7 @@ public class UserController {
         log.info("Admin: Delete user id={}", id);
         userService.deleteUser(id);
 
-        return ApiResponse.success("User deleted successfully");
+        return ApiResponse.success(translator.toLocale("success.user.deleted"));
     }
 
     @Operation(summary = "Restore user (Admin)", description = "Restores a previously soft-deleted user. Requires ADMIN role.")
@@ -163,7 +165,7 @@ public class UserController {
             @Parameter(description = "User ID") @PathVariable Long id) {
         log.info("Admin: Restore user id={}", id);
         userService.restoreUser(id);
-        return ApiResponse.success("User restored successfully");
+        return ApiResponse.success(translator.toLocale("success.user.restored"));
     }
 
     @Operation(summary = "Toggle user status (Admin)", description = "Toggles a user's status between ACTIVE and BANNED. Requires ADMIN role.")
@@ -175,6 +177,6 @@ public class UserController {
             @Parameter(description = "User ID") @PathVariable Long id) {
         log.info("Admin: Toggle status for user id={}", id);
         userService.toggleUserStatus(id);
-        return ApiResponse.success("User status toggled successfully");
+        return ApiResponse.success(translator.toLocale("success.user.status_toggled"));
     }
 }
