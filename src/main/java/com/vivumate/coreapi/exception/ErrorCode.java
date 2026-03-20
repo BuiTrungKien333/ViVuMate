@@ -31,6 +31,8 @@ public enum ErrorCode {
     USER_NOT_DELETED(1017, "error.user.notdelete", HttpStatus.BAD_REQUEST),
     ENDPOINT_NOT_FOUND(1018, "error.endpoint.notfound", HttpStatus.NOT_FOUND),
     TOO_MANY_REQUESTS(1019, "error.many.request", HttpStatus.TOO_MANY_REQUESTS),
+    USER_ALREADY_VERIFIED(1020, "error.account.verified", HttpStatus.BAD_REQUEST),
+    ACCOUNT_UNVERIFIED(1021, "error.account.unverify", HttpStatus.FORBIDDEN),
 
     WEATHER_API_ERROR(2001, "error.weather.api", HttpStatus.BAD_GATEWAY),
     WEATHER_DATA_PARSE_ERROR(2002, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR),

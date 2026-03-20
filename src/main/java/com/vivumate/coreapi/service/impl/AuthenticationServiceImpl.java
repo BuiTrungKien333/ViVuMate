@@ -56,7 +56,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private long refreshTokenExpiration;
 
     @Value("${vivumate.jwt.reset.expiration}")
-    private long resetExpiration;
+    private long resetTokenExpiration;
+
+    @Value("${vivumate.jwt.verify.expiration}")
+    private long verifyTokenExpiration;
 
     @Value("${vivumate.app.frontend-url}")
     private String frontendUrl;
@@ -64,7 +67,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     // --- REGISTER ---
     @Override
     @Transactional
-    public AuthenticationResponse register(UserCreationRequest request) {
+    public String register(UserCreationRequest request) {
         log.info("(Attempt) Register user: {}", request.getEmail());
 
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -88,31 +91,23 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .fullName(request.getFullName())
                 .gender(request.getGender())
                 .dateOfBirth(request.getDateOfBirth())
-                .status(UserStatus.ACTIVE)
                 .roles(java.util.Set.of(defaultRole))
                 .provider(AuthProvider.LOCAL)
                 .verified(false)
-                .online(true)
-                .lastLoginAt(LocalDateTime.now())
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("(Success) Register user: {} (username={})", savedUser.getEmail(), savedUser.getUsername());
+        log.info("(Success, Unverified) Register user: {} (username={})", savedUser.getEmail(), savedUser.getUsername());
 
-        savedUser.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
+        // verify email
+        String verifyToken = jwtUtils.generateVerifyToken(savedUser);
 
-        String accessToken = jwtUtils.generateToken(savedUser);
-        String refreshToken = jwtUtils.generateRefreshToken(savedUser);
-        saveUserRefreshTokenToDb(savedUser, refreshToken);
+        redisService.saveVerifyToken(savedUser.getUsername(), verifyToken, verifyTokenExpiration);
 
-        return AuthenticationResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .expiresIn(accessExpiration)
-                .userId(savedUser.getId())
-                .username(savedUser.getUsername())
-                .roles(savedUser.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .build();
+        String verifyLink = frontendUrl + "/verify-email?token=" + verifyToken;
+        emailService.sendVerificationEmail(savedUser.getEmail(), savedUser.getFullName(), verifyLink);
+
+        return "Registration successful! Please check your email to activate your account.";
     }
 
     // --- LOGIN ---
@@ -194,7 +189,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public void forgotPassword(ForgotPasswordRequest request) {
         log.info("(Attempt) Forgot password for email: {}", request.getEmail());
 
-        if(redisService.isCooldown(request.getEmail())) {
+        if (redisService.isCooldown(request.getEmail())) {
             throw new AppException(ErrorCode.TOO_MANY_REQUESTS);
         }
 
@@ -210,7 +205,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
 
         String resetToken = jwtUtils.generateResetToken(user);
-        redisService.saveResetToken(user.getUsername(), resetToken, resetExpiration);
+        redisService.saveResetToken(user.getUsername(), resetToken, resetTokenExpiration);
 
         String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
         emailService.sendResetPasswordEmail(user.getEmail(), user.getFullName(), resetLink);
@@ -225,7 +220,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         String username = jwtUtils.extractUsername(request.getToken(), TokenType.RESET_TOKEN);
         String savedTokenUser = redisService.getResetToken(username);
 
-        if(savedTokenUser == null || !savedTokenUser.equals(request.getToken())) {
+        if (savedTokenUser == null || !savedTokenUser.equals(request.getToken())) {
             log.warn("(Failed) Reset token not found in Redis or mismatched for user: {}", username);
             throw new AppException(ErrorCode.TOKEN_INVALID);
         }
@@ -268,6 +263,49 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             user.setLastSeen(LocalDateTime.now());
             userRepository.save(user);
         }
+    }
+
+    @Override
+    public AuthenticationResponse verifyEmail(VerifyEmailRequest request) {
+        log.info("(Attempt) Verify email");
+
+        String username = jwtUtils.extractUsername(request.getToken(), TokenType.VERIFY_TOKEN);
+        String savedToken = redisService.getVerifyToken(username);
+
+        if (savedToken == null || !savedToken.equals(request.getToken())) {
+            throw new AppException(ErrorCode.TOKEN_INVALID);
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        if (user.isVerified()) {
+            throw new AppException(ErrorCode.USER_ALREADY_VERIFIED);
+        }
+
+        user.setVerified(true);
+        user.setStatus(UserStatus.ACTIVE);
+        user.setLastLoginAt(LocalDateTime.now());
+        user.setOnline(true);
+
+        userRepository.save(user);
+
+        redisService.deleteVerifyToken(username);
+
+        user.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
+
+        String accessToken = jwtUtils.generateToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
+        saveUserRefreshTokenToDb(user, refreshToken);
+
+        return AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(accessExpiration)
+                .userId(user.getId())
+                .username(user.getUsername())
+                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
+                .build();
     }
 
     private void saveUserRefreshTokenToDb(User user, String jwtToken) {

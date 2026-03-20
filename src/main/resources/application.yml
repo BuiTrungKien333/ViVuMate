@@ -58,6 +58,7 @@ vivumate:
     secret-key: ${JWT_SECRET_KEY}
     refreshKey: ${JWT_REFRESH_KEY}
     resetKey: ${JWT_RESET_KEY}
+    verifyKey: ${JWT_VERIFY_KEY}
 
     access:
       expiration: 1800000 # 30 phút
@@ -65,6 +66,8 @@ vivumate:
       expiration: 604800000 # 7 ngày
     reset:
       expiration: 300000 # 5 phút
+    verify:
+      expiration: 900000 # 15 phút
 
   app:
     frontend-url: ${FRONTEND_URL:http://localhost:3000}

@@ -30,7 +30,7 @@ public class EmailServiceImpl implements EmailService {
 
         try {
             Context context = new Context();
-            context.setVariable("fullName", fullName);
+            context.setVariable("name", fullName);
             context.setVariable("resetLink", resetLink);
 
             String htmlContent = templateEngine.process("reset-password", context);
@@ -47,6 +47,34 @@ public class EmailServiceImpl implements EmailService {
             log.info("(Success) Reset password email sent to: {}", to);
         } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("(Failed) Could not send reset password email to: {}. Error: {}", to, e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendVerificationEmail(String to, String fullName, String verifyLink) {
+        to = "buitrungkien2005qng@gmail.com";
+        log.info("(Attempt) Sending verify email to: {}", to);
+
+        try {
+            Context context = new Context();
+            context.setVariable("name", fullName);
+            context.setVariable("verifyLink", verifyLink);
+
+            String htmlContent = templateEngine.process("verify-email", context);
+
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+            helper.setFrom("onboarding@resend.dev", "ViVuMate Security");
+            helper.setTo(to);
+            helper.setSubject("[ViVuMate] Kích hoạt tài khoản ViVuMate của bạn");
+            helper.setText(htmlContent, true);
+
+            mailSender.send(mimeMessage);
+            log.info("(Success) Verify email sent to: {}", to);
+        } catch (MessagingException | UnsupportedEncodingException e) {
+            log.error("(Failed) Could not send verify email to: {}. Error: {}", to, e.getMessage());
         }
     }
 }

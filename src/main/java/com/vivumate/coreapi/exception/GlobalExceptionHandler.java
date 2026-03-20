@@ -6,8 +6,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -158,18 +157,25 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(ErrorCode.LOGIN_BAD_CREDENTIALS);
     }
 
-    @ExceptionHandler({ LockedException.class, DisabledException.class })
+    @ExceptionHandler({LockedException.class, DisabledException.class})
     public ResponseEntity<ApiResponse<Void>> handleAccountStatusException(Exception e) {
         log.warn("Account status invalid: {}", e.getClass().getSimpleName());
-        return buildErrorResponse(
-                e.getMessage().equals("ACCOUNT_DELETED") ? ErrorCode.ACCOUNT_DELETED : ErrorCode.ACCOUNT_DISABLED);
+
+        ErrorCode errorCode = switch (e.getMessage()) {
+            case "ACCOUNT_DELETED" -> ErrorCode.ACCOUNT_DELETED;
+            case "ACCOUNT_UNVERIFIED" -> ErrorCode.ACCOUNT_UNVERIFIED;
+            case "ACCOUNT_BANNED" -> ErrorCode.ACCOUNT_LOCKED;
+            default -> ErrorCode.ACCOUNT_DISABLED;
+        };
+
+        return buildErrorResponse(errorCode);
     }
 
     /*
      * JWT Exceptions
      */
-    @ExceptionHandler({ io.jsonwebtoken.security.SignatureException.class,
-            io.jsonwebtoken.MalformedJwtException.class })
+    @ExceptionHandler({io.jsonwebtoken.security.SignatureException.class,
+            io.jsonwebtoken.MalformedJwtException.class})
     public ResponseEntity<ApiResponse<Void>> handleTokenInvalid(Exception e) {
         log.warn("Invalid JWT token");
         return buildErrorResponse(ErrorCode.TOKEN_INVALID);
@@ -184,7 +190,7 @@ public class GlobalExceptionHandler {
     /*
      * API Endpoint Not Found Exceptions
      */
-    @ExceptionHandler({ NoResourceFoundException.class, NoHandlerFoundException.class })
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     public ResponseEntity<ApiResponse<Void>> handleEndpointNotFound(Exception e) {
         String path = "unknown";
 

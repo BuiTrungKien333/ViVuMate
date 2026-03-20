@@ -1,10 +1,6 @@
 package com.vivumate.coreapi.controller;
 
-import com.vivumate.coreapi.dto.request.AuthenticationRequest;
-import com.vivumate.coreapi.dto.request.ForgotPasswordRequest;
-import com.vivumate.coreapi.dto.request.RefreshTokenRequest;
-import com.vivumate.coreapi.dto.request.ResetPasswordRequest;
-import com.vivumate.coreapi.dto.request.UserCreationRequest;
+import com.vivumate.coreapi.dto.request.*;
 import com.vivumate.coreapi.dto.response.ApiResponse;
 import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.exception.AppException;
@@ -48,9 +44,15 @@ public class AuthenticationController {
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already exists", content = @Content)
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<AuthenticationResponse> register(@RequestBody @Valid UserCreationRequest request) {
+    public ApiResponse<String> register(@RequestBody @Valid UserCreationRequest request) {
         log.info("Register request received for email={}", request.getEmail());
         return ApiResponse.success(authenticationService.register(request));
+    }
+
+    @Operation(summary = "Email verification and automatic login.")
+    @PostMapping("/verify-email")
+    public ApiResponse<AuthenticationResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        return ApiResponse.success(authenticationService.verifyEmail(request));
     }
 
     @Operation(summary = "Refresh Access Token", description = "When the Access Token expires, use the Refresh Token to obtain a new pair of tokens without requiring the user to log in again.")

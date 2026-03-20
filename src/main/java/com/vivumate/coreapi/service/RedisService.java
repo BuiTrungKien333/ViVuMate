@@ -1,45 +1,21 @@
 package com.vivumate.coreapi.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.stereotype.Service;
+public interface RedisService {
 
-import java.util.concurrent.TimeUnit;
+    void saveResetToken(String email, String token, long ttl);
 
-@Service
-@RequiredArgsConstructor
-@Slf4j(topic = "REDIS_SERVICE")
-public class RedisService {
+    String getResetToken(String email);
 
-    private final StringRedisTemplate redisTemplate;
+    void deleteResetToken(String email);
 
-    private static final String RESET_PWD_PREFIX = "reset_pwd:";
-    private static final String COOLDOWN_PREFIX = "cooldown_reset:";
+    boolean isCooldown(String email);
 
-    public void saveResetToken(String email, String token, long ttl) {
-        String key = RESET_PWD_PREFIX + email;
-        redisTemplate.opsForValue().set(key, token, ttl, TimeUnit.MILLISECONDS);
-        log.debug("Saved Reset Token for email: {} (Expiration: {} milliseconds)", email, ttl);
-    }
+    void setCooldown(String email, long seconds);
 
-    public String getResetToken(String email) {
-        String key = RESET_PWD_PREFIX + email;
-        return redisTemplate.opsForValue().get(key);
-    }
+    void saveVerifyToken(String email, String token, long ttl);
 
-    public void deleteResetToken(String email) {
-        String key = RESET_PWD_PREFIX + email;
-        redisTemplate.delete(key);
-        log.debug("Deleted the Reset Token for email: {}", email);
-    }
+    String getVerifyToken(String email);
 
-    public boolean isCooldown(String email) {
-        return Boolean.TRUE.equals(redisTemplate.hasKey(COOLDOWN_PREFIX + email));
-    }
-
-    public void setCooldown(String email, long seconds) {
-        redisTemplate.opsForValue().set(COOLDOWN_PREFIX + email, "locked", seconds, TimeUnit.SECONDS);
-    }
+    void deleteVerifyToken(String email);
 
 }

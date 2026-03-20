@@ -4,7 +4,8 @@ import com.vivumate.coreapi.dto.request.*;
 import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 
 public interface AuthenticationService {
-    AuthenticationResponse register(UserCreationRequest request);
+
+    String register(UserCreationRequest request);
 
     AuthenticationResponse authenticate(AuthenticationRequest request);
 
@@ -15,4 +16,6 @@ public interface AuthenticationService {
     void resetPassword(ResetPasswordRequest request);
 
     void logout(String accessToken, String refreshToken);
+
+    AuthenticationResponse verifyEmail(VerifyEmailRequest request);
 }
