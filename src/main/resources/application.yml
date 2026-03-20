@@ -26,7 +26,7 @@ spring:
       accept-case-insensitive-enums: true
 
   mail:
-#    host: smtp.gmail.com
+    #    host: smtp.gmail.com
     host: smtp.resend.com
     port: 587
     username: ${MAIL_USERNAME}
@@ -68,6 +68,8 @@ vivumate:
       expiration: 300000 # 5 phút
     verify:
       expiration: 900000 # 15 phút
+    otp-login:
+      expiration: 300000 # 5 phút
 
   app:
     frontend-url: ${FRONTEND_URL:http://localhost:3000}

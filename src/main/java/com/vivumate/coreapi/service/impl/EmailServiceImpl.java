@@ -13,6 +13,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -25,56 +26,64 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async
     public void sendResetPasswordEmail(String to, String fullName, String resetLink) {
-        to = "buitrungkien2005qng@gmail.com";
         log.info("(Attempt) Sending reset password email to: {}", to);
 
-        try {
-            Context context = new Context();
-            context.setVariable("name", fullName);
-            context.setVariable("resetLink", resetLink);
+        Map<String, Object> variables = Map.of(
+                "name", fullName,
+                "resetLink", resetLink
+        );
 
-            String htmlContent = templateEngine.process("reset-password", context);
-
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-
-            helper.setFrom("onboarding@resend.dev", "ViVuMate Security");
-            helper.setTo(to);
-            helper.setSubject("[ViVuMate] Yêu cầu khôi phục mật khẩu");
-            helper.setText(htmlContent, true);
-
-            mailSender.send(mimeMessage);
-            log.info("(Success) Reset password email sent to: {}", to);
-        } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("(Failed) Could not send reset password email to: {}. Error: {}", to, e.getMessage());
-        }
+        sendHtmlEmail(to, "[ViVuMate] Yêu cầu khôi phục mật khẩu", "reset-password", variables);
     }
 
     @Override
     @Async
     public void sendVerificationEmail(String to, String fullName, String verifyLink) {
-        to = "buitrungkien2005qng@gmail.com";
         log.info("(Attempt) Sending verify email to: {}", to);
 
+        Map<String, Object> variables = Map.of(
+                "name", fullName,
+                "verifyLink", verifyLink
+        );
+
+        sendHtmlEmail(to, "[ViVuMate] Kích hoạt tài khoản ViVuMate của bạn", "verify-email", variables);
+    }
+
+    @Override
+    @Async
+    public void sendLoginOtpEmail(String to, String fullName, String otp) {
+        log.info("(Attempt) Sending login OTP email to: {}", to);
+
+        Map<String, Object> variables = Map.of(
+                "name", fullName,
+                "otp", otp
+        );
+
+        sendHtmlEmail(to, "[ViVuMate] Mã xác thực đăng nhập", "login-otp", variables);
+    }
+
+    /**
+     * Private helper: render Thymeleaf template + gửi MimeMessage.
+     */
+    private void sendHtmlEmail(String to, String subject, String templateName, Map<String, Object> variables) {
         try {
             Context context = new Context();
-            context.setVariable("name", fullName);
-            context.setVariable("verifyLink", verifyLink);
+            variables.forEach(context::setVariable);
 
-            String htmlContent = templateEngine.process("verify-email", context);
+            String htmlContent = templateEngine.process(templateName, context);
 
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
             helper.setFrom("onboarding@resend.dev", "ViVuMate Security");
             helper.setTo(to);
-            helper.setSubject("[ViVuMate] Kích hoạt tài khoản ViVuMate của bạn");
+            helper.setSubject(subject);
             helper.setText(htmlContent, true);
 
             mailSender.send(mimeMessage);
-            log.info("(Success) Verify email sent to: {}", to);
+            log.info("(Success) Email '{}' sent to: {}", subject, to);
         } catch (MessagingException | UnsupportedEncodingException e) {
-            log.error("(Failed) Could not send verify email to: {}. Error: {}", to, e.getMessage());
+            log.error("(Failed) Could not send email '{}' to: {}. Error: {}", subject, to, e.getMessage());
         }
     }
 }

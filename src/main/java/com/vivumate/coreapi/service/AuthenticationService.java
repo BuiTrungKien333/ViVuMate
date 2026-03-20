@@ -18,4 +18,6 @@ public interface AuthenticationService {
     void logout(String accessToken, String refreshToken);
 
     AuthenticationResponse verifyEmail(VerifyEmailRequest request);
+
+    AuthenticationResponse verifyLoginOtp(VerifyLoginOtpRequest request);
 }

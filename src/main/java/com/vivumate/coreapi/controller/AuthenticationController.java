@@ -49,7 +49,12 @@ public class AuthenticationController {
         return ApiResponse.success(authenticationService.register(request));
     }
 
-    @Operation(summary = "Email verification and automatic login.")
+    @Operation(summary = "Email verification and automatic login",
+            description = "Verifies the user's email using a token sent during registration. "
+                    + "If valid, activates the account and returns a JWT token pair for automatic login.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Email verified and login successful")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1007", description = "Invalid or expired verification token", content = @Content)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1020", description = "Account already verified", content = @Content)
     @PostMapping("/verify-email")
     public ApiResponse<AuthenticationResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
         return ApiResponse.success(authenticationService.verifyEmail(request));
@@ -100,6 +105,18 @@ public class AuthenticationController {
         log.info("Reset password request received");
         authenticationService.resetPassword(request);
         return ApiResponse.success(translator.toLocale("success.auth.reset_password"));
+    }
+
+    @Operation(summary = "Verify Login OTP",
+            description = "Verifies the OTP sent to the user's email during a suspicious login attempt. "
+                    + "If valid, issues JWT tokens and completes the login process.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OTP verified, login successful")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1022", description = "Invalid OTP code", content = @Content)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1023", description = "OTP has expired", content = @Content)
+    @PostMapping("/verify-login-otp")
+    public ApiResponse<AuthenticationResponse> verifyLoginOtp(@RequestBody @Valid VerifyLoginOtpRequest request) {
+        log.info("Verify login OTP request received for email={}", request.getEmail());
+        return ApiResponse.success(authenticationService.verifyLoginOtp(request));
     }
 
 }

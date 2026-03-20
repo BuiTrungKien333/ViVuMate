@@ -18,4 +18,10 @@ public interface RedisService {
 
     void deleteVerifyToken(String email);
 
+    void saveLoginOtp(String email, String otp, long ttl);
+
+    String getLoginOtp(String email);
+
+    void deleteLoginOtp(String email);
+
 }

@@ -18,6 +18,7 @@ public class RedisServiceImpl implements RedisService {
     private static final String RESET_PWD_PREFIX = "reset_pwd:";
     private static final String COOLDOWN_PREFIX = "cooldown_reset:";
     private static final String VERIFY_EMAIL_PREFIX = "verify_email:";
+    private static final String LOGIN_OTP_PREFIX = "login_otp:";
 
     @Override
     public void saveResetToken(String email, String token, long ttl) {
@@ -66,6 +67,27 @@ public class RedisServiceImpl implements RedisService {
     @Override
     public void deleteVerifyToken(String email) {
         String key = VERIFY_EMAIL_PREFIX + email;
+        redisTemplate.delete(key);
+    }
+
+    // --- Login OTP ---
+
+    @Override
+    public void saveLoginOtp(String email, String otp, long ttl) {
+        String key = LOGIN_OTP_PREFIX + email;
+        redisTemplate.opsForValue().set(key, otp, ttl, TimeUnit.MILLISECONDS);
+        log.debug("Login OTP saved for email: {}", email);
+    }
+
+    @Override
+    public String getLoginOtp(String email) {
+        String key = LOGIN_OTP_PREFIX + email;
+        return redisTemplate.opsForValue().get(key);
+    }
+
+    @Override
+    public void deleteLoginOtp(String email) {
+        String key = LOGIN_OTP_PREFIX + email;
         redisTemplate.delete(key);
     }
 

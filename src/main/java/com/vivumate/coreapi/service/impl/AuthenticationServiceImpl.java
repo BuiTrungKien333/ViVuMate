@@ -3,6 +3,7 @@ package com.vivumate.coreapi.service.impl;
 import com.vivumate.coreapi.dto.request.*;
 import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.entity.RefreshToken;
+
 import com.vivumate.coreapi.entity.Role;
 import com.vivumate.coreapi.entity.User;
 import com.vivumate.coreapi.enums.AuthProvider;
@@ -29,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -61,8 +63,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Value("${vivumate.jwt.verify.expiration}")
     private long verifyTokenExpiration;
 
+    @Value("${vivumate.jwt.otp-login.expiration}")
+    private long otpExpiration;
+
     @Value("${vivumate.app.frontend-url}")
     private String frontendUrl;
+
+    private static final int SUSPICIOUS_LOGIN_DAYS = 30;
 
     // --- REGISTER ---
     @Override
@@ -94,10 +101,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .roles(java.util.Set.of(defaultRole))
                 .provider(AuthProvider.LOCAL)
                 .verified(false)
+                .status(UserStatus.INACTIVE)
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("(Success, Unverified) Register user: {} (username={})", savedUser.getEmail(), savedUser.getUsername());
+        log.info("(Success, Unverified) Register user: {} (username={})", savedUser.getEmail(),
+                savedUser.getUsername());
+
+        // Set authorities before generate token
+        savedUser.setAuthorities(UserMapper.buildAuthorities(savedUser.getRoles()));
 
         // verify email
         String verifyToken = jwtUtils.generateVerifyToken(savedUser);
@@ -122,12 +134,25 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         var user = (User) authentication.getPrincipal();
 
+        // Suspicious login detection: inactive > 30 days
+        if (isSuspiciousLogin(user)) {
+            log.warn("Suspicious login detected for user: {} - requiring OTP", user.getUsername());
+            final String otp = generateOtp();
+            redisService.saveLoginOtp(user.getEmail(), otp, otpExpiration);
+            emailService.sendLoginOtpEmail(user.getEmail(), user.getFullName(), otp);
+
+            return AuthenticationResponse.builder()
+                    .requireOtp(true)
+                    .build();
+        }
+
         user.setLastLoginAt(LocalDateTime.now());
+        user.setLastSeen(LocalDateTime.now());
         user.setOnline(true);
         userRepository.save(user);
 
-        String accessToken = jwtUtils.generateToken(user);
-        String refreshToken = jwtUtils.generateRefreshToken(user);
+        final String accessToken = jwtUtils.generateToken(user);
+        final String refreshToken = jwtUtils.generateRefreshToken(user);
 
         saveUserRefreshTokenToDb(user, refreshToken);
         log.info("(Success) Login user: {}", request.getIdentifier());
@@ -193,11 +218,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.TOO_MANY_REQUESTS);
         }
 
+        // chặn trước khi nó xuống được db để check email, chống spam
         redisService.setCooldown(request.getEmail(), 60);
 
         Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
         if (userOpt.isEmpty()) {
-            log.warn("Someone tried to recover their password using a non-existent email address: {}", request.getEmail());
+            log.debug("Someone tried to recover their password using a non-existent email address: {}",
+                    request.getEmail());
             return;
         }
 
@@ -225,22 +252,22 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new AppException(ErrorCode.TOKEN_INVALID);
         }
 
-        var userDetails = userDetailsService.loadUserByUsername(username);
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        if (!jwtUtils.isTokenValid(request.getToken(), userDetails, TokenType.RESET_TOKEN)) {
+        if (!jwtUtils.isTokenValid(request.getToken(), user, TokenType.RESET_TOKEN)) {
             log.warn("(Failed) Reset token invalid or expired for user: {}", username);
             throw new AppException(ErrorCode.TOKEN_INVALID);
         }
 
-        User user = (User) userDetails;
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setLastSeen(LocalDateTime.now()); // Prevent suspicious login OTP after reset
         userRepository.save(user);
 
         redisService.deleteResetToken(username);
 
         // Bảo mật nâng cao: Revoke tất cả RefreshToken
         refreshTokenRepository.revokeAllByUser(user);
-
         log.info("(Success) Password reset for user: {}", username);
     }
 
@@ -266,18 +293,27 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
+    @Transactional
     public AuthenticationResponse verifyEmail(VerifyEmailRequest request) {
         log.info("(Attempt) Verify email");
 
         String username = jwtUtils.extractUsername(request.getToken(), TokenType.VERIFY_TOKEN);
         String savedToken = redisService.getVerifyToken(username);
 
+        // Check token in redis
         if (savedToken == null || !savedToken.equals(request.getToken())) {
             throw new AppException(ErrorCode.TOKEN_INVALID);
         }
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        // Validate JWT signature & expiry
+        user.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
+        if (!jwtUtils.isTokenValid(request.getToken(), user, TokenType.VERIFY_TOKEN)) {
+            log.warn("(Failed) Verify token invalid or expired for user: {}", username);
+            throw new AppException(ErrorCode.TOKEN_INVALID);
+        }
 
         if (user.isVerified()) {
             throw new AppException(ErrorCode.USER_ALREADY_VERIFIED);
@@ -286,16 +322,15 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         user.setVerified(true);
         user.setStatus(UserStatus.ACTIVE);
         user.setLastLoginAt(LocalDateTime.now());
+        user.setLastSeen(LocalDateTime.now());
         user.setOnline(true);
 
         userRepository.save(user);
 
         redisService.deleteVerifyToken(username);
 
-        user.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
-
-        String accessToken = jwtUtils.generateToken(user);
-        String refreshToken = jwtUtils.generateRefreshToken(user);
+        final String accessToken = jwtUtils.generateToken(user);
+        final String refreshToken = jwtUtils.generateRefreshToken(user);
         saveUserRefreshTokenToDb(user, refreshToken);
 
         return AuthenticationResponse.builder()
@@ -306,6 +341,66 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .username(user.getUsername())
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
                 .build();
+    }
+
+    // --- VERIFY LOGIN OTP ---
+    @Override
+    @Transactional
+    public AuthenticationResponse verifyLoginOtp(VerifyLoginOtpRequest request) {
+        log.info("(Attempt) Verify login OTP for email: {}", request.getEmail());
+
+        String savedOtp = redisService.getLoginOtp(request.getEmail());
+
+        if (savedOtp == null) {
+            log.warn("(Failed) OTP expired or not found for email: {}", request.getEmail());
+            throw new AppException(ErrorCode.OTP_EXPIRED);
+        }
+
+        if (!savedOtp.equals(request.getOtp())) {
+            log.warn("(Failed) Invalid OTP for email: {}", request.getEmail());
+            throw new AppException(ErrorCode.INVALID_OTP);
+        }
+
+        redisService.deleteLoginOtp(request.getEmail());
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        user.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
+        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastSeen(LocalDateTime.now());
+        user.setOnline(true);
+        userRepository.save(user);
+
+        String accessToken = jwtUtils.generateToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
+        saveUserRefreshTokenToDb(user, refreshToken);
+
+        log.info("(Success) OTP verified, login complete for user: {}", user.getUsername());
+
+        return AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .expiresIn(accessExpiration)
+                .userId(user.getId())
+                .username(user.getUsername())
+                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
+                .build();
+    }
+
+    // --- PRIVATE HELPERS ---
+
+    private boolean isSuspiciousLogin(User user) {
+        if (user.getLastSeen() == null) {
+            return true; // First login or never seen before
+        }
+        return user.getLastSeen().isBefore(LocalDateTime.now().minusDays(SUSPICIOUS_LOGIN_DAYS));
+    }
+
+    private String generateOtp() {
+        SecureRandom random = new SecureRandom();
+        int otp = random.nextInt(900000) + 100000; // 100000 - 999999
+        return String.valueOf(otp);
     }
 
     private void saveUserRefreshTokenToDb(User user, String jwtToken) {

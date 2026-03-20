@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Xác thực tài khoản - ViVuMate</title>
+    <title>Mã xác thực đăng nhập - ViVuMate</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
 
@@ -21,7 +21,7 @@
                             ViVuMate
                         </h1>
                         <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">
-                            Chào mừng bạn đến với ViVuMate!
+                            Cảnh báo đăng nhập mới
                         </p>
                     </td>
                 </tr>
@@ -33,18 +33,17 @@
                             Xin chào <strong th:text="${name}">Bạn</strong>,
                         </p>
                         <p style="font-size: 15px; color: #555555; line-height: 1.6; margin: 0 0 24px;">
-                            Cảm ơn bạn đã đăng ký tài khoản ViVuMate! Để bắt đầu sử dụng,
-                            vui lòng xác thực địa chỉ email của bạn bằng cách nhấn vào nút bên dưới:
+                            Chúng tôi phát hiện một lượt đăng nhập mới vào tài khoản ViVuMate của bạn
+                            sau một thời gian dài không hoạt động. Để bảo vệ tài khoản, vui lòng nhập mã xác thực bên dưới:
                         </p>
 
-                        <!-- CTA Button -->
+                        <!-- OTP Code -->
                         <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 32px;">
                             <tr>
-                                <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                                    <a th:href="${verifyLink}" target="_blank"
-                                       style="display: inline-block; padding: 14px 36px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
-                                        Xác thực tài khoản
-                                    </a>
+                                <td align="center" style="background-color: #f0f0f5; border-radius: 12px; padding: 20px 48px; border: 2px dashed #667eea;">
+                                    <span th:text="${otp}" style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #667eea; font-family: 'Courier New', monospace;">
+                                        000000
+                                    </span>
                                 </td>
                             </tr>
                         </table>
@@ -52,22 +51,21 @@
                         <!-- Expiry Notice -->
                         <div style="background-color: #fff8e1; border-left: 4px solid #ff9800; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
                             <p style="font-size: 14px; color: #e65100; margin: 0; font-weight: 500;">
-                                ⏰ Link này sẽ hết hạn sau <strong>15 phút</strong>.
+                                ⏰ Mã này sẽ hết hạn sau <strong>5 phút</strong>.
                             </p>
                         </div>
 
-                        <!-- Security Notice -->
-                        <p style="font-size: 13px; color: #888888; line-height: 1.5; margin: 0 0 8px;">
-                            Nếu bạn không đăng ký tài khoản ViVuMate, vui lòng bỏ qua email này.
-                        </p>
+                        <!-- Security Warning -->
+                        <div style="background-color: #fce4ec; border-left: 4px solid #e53935; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                            <p style="font-size: 14px; color: #c62828; margin: 0; font-weight: 500;">
+                                ⚠️ Nếu bạn không thực hiện đăng nhập này, vui lòng <strong>đổi mật khẩu ngay lập tức</strong>
+                                vì có thể ai đó đã biết mật khẩu của bạn.
+                            </p>
+                        </div>
 
-                        <!-- Fallback Link -->
-                        <p style="font-size: 12px; color: #aaaaaa; line-height: 1.5; margin: 24px 0 0; word-break: break-all;">
-                            Nếu nút không hoạt động, sao chép và dán link sau vào trình duyệt:<br/>
-                            <a th:href="${verifyLink}" th:text="${verifyLink}"
-                               style="color: #667eea; text-decoration: underline;">
-                                Verify Link
-                            </a>
+                        <!-- Additional Notice -->
+                        <p style="font-size: 13px; color: #888888; line-height: 1.5; margin: 0;">
+                            Không chia sẻ mã OTP này với bất kỳ ai vì lý do bảo mật.
                         </p>
                     </td>
                 </tr>

@@ -33,6 +33,8 @@ public enum ErrorCode {
     TOO_MANY_REQUESTS(1019, "error.many.request", HttpStatus.TOO_MANY_REQUESTS),
     USER_ALREADY_VERIFIED(1020, "error.account.verified", HttpStatus.BAD_REQUEST),
     ACCOUNT_UNVERIFIED(1021, "error.account.unverify", HttpStatus.FORBIDDEN),
+    INVALID_OTP(1022, "error.otp.invalid", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1023, "error.otp.expired", HttpStatus.BAD_REQUEST),
 
     WEATHER_API_ERROR(2001, "error.weather.api", HttpStatus.BAD_GATEWAY),
     WEATHER_DATA_PARSE_ERROR(2002, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR),
