@@ -33,11 +33,17 @@ public class JwtUtils {
     @Value("${vivumate.jwt.resetKey}")
     private String resetKey;
 
+    @Value("${vivumate.jwt.verifyKey}")
+    private String verifyKey;
+
     @Value("${vivumate.jwt.access.expiration}")
     private long jwtExpiration;
 
     @Value("${vivumate.jwt.refresh.expiration}")
     private long jwtRefreshExpiration;
+
+    @Value("${vivumate.jwt.verify.expiration}")
+    private long jwtVerifyEmailExpiration;
 
     @Value("${vivumate.jwt.reset.expiration}")
     private long jwtResetExpiration;
@@ -58,6 +64,10 @@ public class JwtUtils {
 
     public String generateRefreshToken(UserDetails userDetails) {
         return buildToken(new HashMap<>(), userDetails, TokenType.REFRESH_TOKEN, jwtRefreshExpiration);
+    }
+
+    public String generateVerifyToken(UserDetails userDetails) {
+        return buildToken(new HashMap<>(), userDetails, TokenType.VERIFY_TOKEN, jwtVerifyEmailExpiration);
     }
 
     public String generateResetToken(UserDetails userDetails) {
@@ -114,6 +124,7 @@ public class JwtUtils {
             case ACCESS_TOKEN -> secretKey;
             case REFRESH_TOKEN -> refreshKey;
             case RESET_TOKEN -> resetKey;
+            case VERIFY_TOKEN -> verifyKey;
         };
 
         byte[] keyBytes = Decoders.BASE64.decode(keyString);

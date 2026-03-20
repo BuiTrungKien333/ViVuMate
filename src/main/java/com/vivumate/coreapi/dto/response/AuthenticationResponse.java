@@ -28,4 +28,7 @@ public class AuthenticationResponse {
     private Long userId;
     private String username;
     private Set<String> roles;
+
+    @JsonProperty("require_otp")
+    private Boolean requireOtp;
 }

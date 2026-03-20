@@ -28,6 +28,11 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("USER_NOT_FOUND"));
 
         String username = user.getUsername();
+        if(!user.isVerified()) {
+            log.warn("Unverified user tried to login: {}", username);
+            throw new DisabledException("ACCOUNT_UNVERIFIED");
+        }
+
         if (user.getDeletedAt() != null) {
             log.warn("Deleted user tried to login: {}", username);
             throw new DisabledException("ACCOUNT_DELETED");

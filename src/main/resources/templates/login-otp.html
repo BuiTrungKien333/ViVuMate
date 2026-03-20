@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Mã xác thực đăng nhập - ViVuMate</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+       style="background-color: #f4f7fa; padding: 40px 0;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"
+                   style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
+
+                <!-- Header -->
+                <tr>
+                    <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px 40px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 1px;">
+                            ViVuMate
+                        </h1>
+                        <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">
+                            Cảnh báo đăng nhập mới
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                    <td style="padding: 40px;">
+                        <p style="font-size: 16px; color: #333333; margin: 0 0 16px;">
+                            Xin chào <strong th:text="${name}">Bạn</strong>,
+                        </p>
+                        <p style="font-size: 15px; color: #555555; line-height: 1.6; margin: 0 0 24px;">
+                            Chúng tôi phát hiện một lượt đăng nhập mới vào tài khoản ViVuMate của bạn
+                            sau một thời gian dài không hoạt động. Để bảo vệ tài khoản, vui lòng nhập mã xác thực bên dưới:
+                        </p>
+
+                        <!-- OTP Code -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 32px;">
+                            <tr>
+                                <td align="center" style="background-color: #f0f0f5; border-radius: 12px; padding: 20px 48px; border: 2px dashed #667eea;">
+                                    <span th:text="${otp}" style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #667eea; font-family: 'Courier New', monospace;">
+                                        000000
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Expiry Notice -->
+                        <div style="background-color: #fff8e1; border-left: 4px solid #ff9800; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                            <p style="font-size: 14px; color: #e65100; margin: 0; font-weight: 500;">
+                                ⏰ Mã này sẽ hết hạn sau <strong>5 phút</strong>.
+                            </p>
+                        </div>
+
+                        <!-- Security Warning -->
+                        <div style="background-color: #fce4ec; border-left: 4px solid #e53935; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                            <p style="font-size: 14px; color: #c62828; margin: 0; font-weight: 500;">
+                                ⚠️ Nếu bạn không thực hiện đăng nhập này, vui lòng <strong>đổi mật khẩu ngay lập tức</strong>
+                                vì có thể ai đó đã biết mật khẩu của bạn.
+                            </p>
+                        </div>
+
+                        <!-- Additional Notice -->
+                        <p style="font-size: 13px; color: #888888; line-height: 1.5; margin: 0;">
+                            Không chia sẻ mã OTP này với bất kỳ ai vì lý do bảo mật.
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="background-color: #f9fafb; padding: 24px 40px; text-align: center; border-top: 1px solid #eaeaea;">
+                        <p style="font-size: 12px; color: #999999; margin: 0;">
+                            © 2026 ViVuMate. All rights reserved.
+                        </p>
+                        <p style="font-size: 11px; color: #bbbbbb; margin: 8px 0 0;">
+                            Email này được gửi tự động, vui lòng không trả lời.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

@@ -5,15 +5,12 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
 @Getter
-public class ChangePasswordRequest {
+public class ResetPasswordRequest {
 
-    @NotBlank(message = "old password required")
-    private String oldPassword;
+    @NotBlank(message = "Token must not be blank")
+    private String token;
 
-    @NotBlank(message = "password require")
+    @NotBlank(message = "New password must not be blank")
     @Size(min = 8, max = 128, message = "Password must be between 8 and 128 characters.")
     private String newPassword;
-
-    @NotBlank(message = "confirm password require")
-    private String confirmPassword;
 }

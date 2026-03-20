@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Xác thực tài khoản - ViVuMate</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+       style="background-color: #f4f7fa; padding: 40px 0;">
+    <tr>
+        <td align="center">
+            <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0"
+                   style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
+
+                <!-- Header -->
+                <tr>
+                    <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 32px 40px; text-align: center;">
+                        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 1px;">
+                            ViVuMate
+                        </h1>
+                        <p style="color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 14px;">
+                            Chào mừng bạn đến với ViVuMate!
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                    <td style="padding: 40px;">
+                        <p style="font-size: 16px; color: #333333; margin: 0 0 16px;">
+                            Xin chào <strong th:text="${name}">Bạn</strong>,
+                        </p>
+                        <p style="font-size: 15px; color: #555555; line-height: 1.6; margin: 0 0 24px;">
+                            Cảm ơn bạn đã đăng ký tài khoản ViVuMate! Để bắt đầu sử dụng,
+                            vui lòng xác thực địa chỉ email của bạn bằng cách nhấn vào nút bên dưới:
+                        </p>
+
+                        <!-- CTA Button -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto 32px;">
+                            <tr>
+                                <td align="center" style="border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                    <a th:href="${verifyLink}" target="_blank"
+                                       style="display: inline-block; padding: 14px 36px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
+                                        Xác thực tài khoản
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Expiry Notice -->
+                        <div style="background-color: #fff8e1; border-left: 4px solid #ff9800; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+                            <p style="font-size: 14px; color: #e65100; margin: 0; font-weight: 500;">
+                                ⏰ Link này sẽ hết hạn sau <strong>15 phút</strong>.
+                            </p>
+                        </div>
+
+                        <!-- Security Notice -->
+                        <p style="font-size: 13px; color: #888888; line-height: 1.5; margin: 0 0 8px;">
+                            Nếu bạn không đăng ký tài khoản ViVuMate, vui lòng bỏ qua email này.
+                        </p>
+
+                        <!-- Fallback Link -->
+                        <p style="font-size: 12px; color: #aaaaaa; line-height: 1.5; margin: 24px 0 0; word-break: break-all;">
+                            Nếu nút không hoạt động, sao chép và dán link sau vào trình duyệt:<br/>
+                            <a th:href="${verifyLink}" th:text="${verifyLink}"
+                               style="color: #667eea; text-decoration: underline;">
+                                Verify Link
+                            </a>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="background-color: #f9fafb; padding: 24px 40px; text-align: center; border-top: 1px solid #eaeaea;">
+                        <p style="font-size: 12px; color: #999999; margin: 0;">
+                            © 2026 ViVuMate. All rights reserved.
+                        </p>
+                        <p style="font-size: 11px; color: #bbbbbb; margin: 8px 0 0;">
+                            Email này được gửi tự động, vui lòng không trả lời.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

@@ -30,9 +30,16 @@ public enum ErrorCode {
     ROLE_NOT_FOUND(1016, "error.user.role.notfound", HttpStatus.NOT_FOUND),
     USER_NOT_DELETED(1017, "error.user.notdelete", HttpStatus.BAD_REQUEST),
     ENDPOINT_NOT_FOUND(1018, "error.endpoint.notfound", HttpStatus.NOT_FOUND),
+    TOO_MANY_REQUESTS(1019, "error.many.request", HttpStatus.TOO_MANY_REQUESTS),
+    USER_ALREADY_VERIFIED(1020, "error.account.verified", HttpStatus.BAD_REQUEST),
+    ACCOUNT_UNVERIFIED(1021, "error.account.unverify", HttpStatus.FORBIDDEN),
+    INVALID_OTP(1022, "error.otp.invalid", HttpStatus.BAD_REQUEST),
+    OTP_EXPIRED(1023, "error.otp.expired", HttpStatus.BAD_REQUEST),
 
     WEATHER_API_ERROR(2001, "error.weather.api", HttpStatus.BAD_GATEWAY),
-    WEATHER_DATA_PARSE_ERROR(2002, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR);
+    WEATHER_DATA_PARSE_ERROR(2002, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    EMAIL_SEND_FAILED(3001, "error.email.send_failed", HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final int code;
     private final String messageKey;

@@ -2,13 +2,13 @@ package com.vivumate.coreapi.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Getter
-@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@ToString
 public class AuthenticationRequest {
 
     @Schema(description = "Username or Email", example = "admin or admin@gmail.com")

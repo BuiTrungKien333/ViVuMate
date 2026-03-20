@@ -57,7 +57,7 @@ public class RedisConfig {
     @Bean
     public RedisCacheConfiguration cacheConfiguration(GenericJackson2JsonRedisSerializer jsonRedisSerializer) {
         return RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(30))
+                .entryTtl(Duration.ofMinutes(15))
                 .disableCachingNullValues()
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(jsonRedisSerializer));
