@@ -119,4 +119,18 @@ public class AuthenticationController {
         return ApiResponse.success(authenticationService.verifyLoginOtp(request));
     }
 
+    @Operation(summary = "Resend Verification Email",
+            description = "Resends a verification email to the user who has registered but hasn't verified yet. "
+                    + "Includes a 60-second cooldown to prevent spam. "
+                    + "For security, always returns the same response regardless of whether the email exists.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Verification email sent (if eligible)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1019", description = "Too many requests", content = @Content)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1020", description = "Account already verified", content = @Content)
+    @PostMapping("/resend-verification")
+    public ApiResponse<String> resendVerification(@RequestBody @Valid ResendVerificationRequest request) {
+        log.info("Resend verification request received for email={}", request.getEmail());
+        authenticationService.resendVerification(request);
+        return ApiResponse.success(translator.toLocale("success.auth.resend_verification"));
+    }
+
 }

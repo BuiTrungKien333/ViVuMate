@@ -3,7 +3,6 @@ package com.vivumate.coreapi.service.impl;
 import com.vivumate.coreapi.dto.request.*;
 import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.entity.RefreshToken;
-
 import com.vivumate.coreapi.entity.Role;
 import com.vivumate.coreapi.entity.User;
 import com.vivumate.coreapi.enums.AuthProvider;
@@ -23,8 +22,8 @@ import com.vivumate.coreapi.service.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.*;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,7 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -128,9 +126,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         log.info("(Attempt) Login user: {}", request.getIdentifier());
 
-        var authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getIdentifier(), request.getPassword()));
+        var authentication = tryAuthenticate(request);
 
         var user = (User) authentication.getPrincipal();
 
@@ -163,7 +159,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .expiresIn(accessExpiration)
                 .userId(user.getId())
                 .username(user.getUsername())
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
                 .build();
     }
 
@@ -339,7 +334,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .expiresIn(accessExpiration)
                 .userId(user.getId())
                 .username(user.getUsername())
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
                 .build();
     }
 
@@ -384,11 +378,78 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .expiresIn(accessExpiration)
                 .userId(user.getId())
                 .username(user.getUsername())
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
                 .build();
     }
 
+    // --- RESEND VERIFICATION EMAIL ---
+    @Override
+    public void resendVerification(ResendVerificationRequest request) {
+        log.info("(Attempt) Resend verification email for: {}", request.getEmail());
+
+        if (redisService.isCooldown(request.getEmail())) {
+            throw new AppException(ErrorCode.TOO_MANY_REQUESTS);
+        }
+
+        redisService.setCooldown(request.getEmail(), 60);
+
+        Optional<User> userOpt = userRepository.findByEmail(request.getEmail());
+        if (userOpt.isEmpty()) {
+            log.debug("Resend verification requested for non-existent email: {}", request.getEmail());
+            return;
+        }
+
+        User user = userOpt.get();
+        if (user.isVerified()) {
+            throw new AppException(ErrorCode.USER_ALREADY_VERIFIED);
+        }
+
+        if (user.getDeletedAt() != null) {
+            throw new AppException(ErrorCode.ACCOUNT_DELETED);
+        }
+
+        // Invalidate old token & generate new one
+        redisService.deleteVerifyToken(user.getUsername());
+
+        user.setAuthorities(UserMapper.buildAuthorities(user.getRoles()));
+        final String verifyToken = jwtUtils.generateVerifyToken(user);
+        redisService.saveVerifyToken(user.getUsername(), verifyToken, verifyTokenExpiration);
+
+        String verifyLink = frontendUrl + "/verify-email?token=" + verifyToken;
+        emailService.sendVerificationEmail(user.getEmail(), user.getFullName(), verifyLink);
+
+        log.info("(Success) Resend verification email queued for: {}", request.getEmail());
+    }
+
     // --- PRIVATE HELPERS ---
+
+    private Authentication tryAuthenticate(AuthenticationRequest request) {
+        try {
+            return authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getIdentifier(), request.getPassword()));
+        } catch (InternalAuthenticationServiceException e) {
+            // DaoAuthenticationProvider wraps exceptions from loadUserByUsername()
+            Throwable cause = e.getCause();
+            if (cause instanceof DisabledException || cause instanceof LockedException) {
+                throw mapAccountStatusException(cause);
+            }
+            throw e;
+        } catch (DisabledException | LockedException e) {
+            throw mapAccountStatusException(e);
+        }
+    }
+
+    private AppException mapAccountStatusException(Throwable e) {
+        if (e instanceof LockedException) {
+            return new AppException(ErrorCode.ACCOUNT_LOCKED);
+        }
+        ErrorCode errorCode = switch (e.getMessage()) {
+            case "ACCOUNT_DELETED" -> ErrorCode.ACCOUNT_DELETED;
+            case "ACCOUNT_UNVERIFIED" -> ErrorCode.ACCOUNT_UNVERIFIED;
+            default -> ErrorCode.ACCOUNT_DISABLED;
+        };
+        return new AppException(errorCode);
+    }
 
     private boolean isSuspiciousLogin(User user) {
         if (user.getLastSeen() == null) {

@@ -20,4 +20,6 @@ public interface AuthenticationService {
     AuthenticationResponse verifyEmail(VerifyEmailRequest request);
 
     AuthenticationResponse verifyLoginOtp(VerifyLoginOtpRequest request);
+
+    void resendVerification(ResendVerificationRequest request);
 }

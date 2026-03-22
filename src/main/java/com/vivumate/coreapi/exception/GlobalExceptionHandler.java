@@ -114,6 +114,7 @@ public class GlobalExceptionHandler {
                 ApiResponse.error(ErrorCode.INVALID_INPUT.getCode(), message));
     }
 
+
     /*
      * Invalid value for enum exception
      */

@@ -2,9 +2,9 @@ package com.vivumate.coreapi.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.*;
-
-import java.util.Set;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
 
 @Getter
 @Setter
@@ -23,11 +23,11 @@ public class AuthenticationResponse {
     private String tokenType = "Bearer";
 
     @JsonProperty("expires_in")
-    private long expiresIn;
+    private Long expiresIn;
 
     private Long userId;
+
     private String username;
-    private Set<String> roles;
 
     @JsonProperty("require_otp")
     private Boolean requireOtp;

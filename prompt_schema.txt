@@ -1,0 +1,104 @@
+You are a senior backend architect specializing in NoSQL database design. I am building a real-time chat application with the following technical stack:
+
+- Backend: Java Spring Boot 3.5
+- Database: MongoDB 7.0
+- Cache: Redis 7.2
+- Frontend: App Mobile React native
+- Use case: Real-time messaging (similar to Slack / WhatsApp / Discord)
+
+---
+
+## CONTEXT & FUNCTIONAL REQUIREMENTS
+
+Design a complete, production-grade MongoDB schema that covers ALL of the following features:
+
+### Core features (must have)
+1. User accounts with profile info. Currently, I've stored some user information in a PostgreSQL database, but consider migrating a few fields to MongoDB for better compatibility if needed.
+2. Direct message (1-1 conversation) between two users
+3. Group conversation (multiple participants, with admin roles)
+4. Messages: text, image, file, video, audio, link preview, system events (e.g. "User joined"). The file will be uploaded to a CDN (S3, Cloudinary) and only the URL will be saved.
+5. Message delivery states: sent → delivered → seen (per recipient)
+6. Typing indicator (ephemeral, do NOT persist long-term)
+7. Online/offline/away presence status per user; consider using Redis or whichever option is most effective.
+
+### Extended features (should have)
+9.  Emoji reactions on messages (multiple reactions, multiple users per reaction)
+10. Message threading / replies (a message can have a reply chain)
+11. Message editing (track edit history with timestamps)
+12. Soft delete (delete for me vs delete for everyone)
+13. Pinned messages per conversation
+14. Mentions (@user, @everyone)
+15. Search: full-text search on message content
+16. Notifications: unread count + last message preview per conversation
+17. Media/attachment metadata (filename, size, MIME type, CDN URL, thumbnail URL)
+18. Link preview metadata (og:title, og:image, og:description)
+
+### Scale & performance requirements
+19. Each conversation can hold millions of messages
+20. A user can be in thousands of conversations
+21. Support cursor-based pagination for message history (infinite scroll)
+22. Optimized for: fetching conversation list sorted by latest activity, fetching message thread, marking all as read
+23. Write-heavy workload: messages are inserted far more often than updated
+
+---
+
+## DESIGN CONSTRAINTS & DECISIONS TO ADDRESS
+
+For each collection you design, explicitly answer:
+
+A. **Embedding vs Referencing**: justify why you embedded or referenced each subdocument. State the tradeoff.
+B. **Document growth**: flag any fields that could cause unbounded array growth and how you mitigate it (e.g. bucketing pattern, separate collection).
+C. **Index design**: list every index needed on the collection, including compound indexes, partial indexes, TTL indexes, and text indexes. State which query pattern each index supports.
+D. **Shard key selection** (if applicable): for collections that will grow very large (messages, events), recommend a shard key and justify it.
+E. **Consistency tradeoffs**: note any fields that are denormalized and explain the update strategy to keep them consistent (e.g. last message preview in conversation document).
+
+---
+
+## SPECIFIC PATTERNS TO APPLY
+
+Use and explain the following MongoDB patterns where appropriate:
+
+- **Bucket Pattern** — for high-volume time-series style message storage if relevant
+- **Subset Pattern** — for caching hot fields (e.g. last N messages, top reactions)
+- **Computed Pattern** — for precomputed aggregates (unread count, member count)
+- **Polymorphic Pattern** — for messages with different content types (text, image, file, etc.)
+- **Outlier Pattern** — handling conversations or users with abnormally large data
+- **Extended Reference Pattern** — for denormalized user info embedded in messages (sender snapshot)
+
+---
+
+## OUTPUT FORMAT
+
+Provide the full schema in this structure:
+
+1. **Collection inventory** — list all collections with a one-line description
+2. **Schema per collection** — for each collection:
+   - Full BSON document example (JSON format, with realistic sample data and all fields)
+   - Field-by-field annotation (type, required/optional, purpose)
+   - Embedded subdocument schemas if applicable
+   - All indexes (annotated with purpose)
+   - Notes on design decisions (embedding/referencing, growth limits, TTL, etc.)
+3. **Relationship diagram** — describe how collections relate (which fields reference which)
+4. **Query pattern guide** — for each major operation below, show the MongoDB query or aggregation pipeline:
+   - Load conversation list for a user (sorted by latest message, with unread count)
+   - Load messages in a conversation (cursor-based, newest-first, with pagination)
+   - Mark all messages as read in a conversation
+   - Fetch a message thread (parent + all replies)
+   - Search messages by keyword in a conversation
+   - Get presence status for a list of user IDs
+   - Add/remove an emoji reaction to a message
+5. **Anti-patterns to avoid** — list 3–5 common MongoDB chat schema mistakes and explain why your design avoids them
+6. **Migration/evolution notes** — how this schema handles future feature additions without breaking changes
+
+---
+
+## CONSTRAINTS FOR YOUR RESPONSE
+
+- Design for MongoDB 6.0+ (use modern features: Time Series if applicable, $lookup, partial indexes, wildcard indexes)
+- Assume Spring Boot uses Spring Data MongoDB with reactive support (Reactor/WebFlux)
+- Do NOT design for a relational model mapped to MongoDB — embrace document-oriented modeling
+- Prioritize read performance for conversation list and message feed (these are the hottest read paths)
+- Use snake_case for all field names
+- Include `created_at` and `updated_at` on all documents
+- All IDs should use MongoDB ObjectId unless there is a strong reason to use UUID
+- Write your response in Vietnamese
