@@ -1,7 +1,7 @@
 package com.vivumate.coreapi.security;
 
 import com.vivumate.coreapi.entity.User;
-import com.vivumate.coreapi.enums.TokenType;
+import com.vivumate.coreapi.entity.enums.TokenType;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;

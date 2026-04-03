@@ -1,4 +1,4 @@
-package com.vivumate.coreapi.utils;
+package com.vivumate.coreapi.util;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;

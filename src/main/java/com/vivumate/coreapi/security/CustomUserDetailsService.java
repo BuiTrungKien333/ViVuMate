@@ -1,7 +1,7 @@
 package com.vivumate.coreapi.security;
 
 import com.vivumate.coreapi.entity.User;
-import com.vivumate.coreapi.enums.UserStatus;
+import com.vivumate.coreapi.entity.enums.UserStatus;
 import com.vivumate.coreapi.mapper.UserMapper;
 import com.vivumate.coreapi.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

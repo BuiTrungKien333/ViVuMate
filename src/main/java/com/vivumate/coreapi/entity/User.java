@@ -1,8 +1,8 @@
 package com.vivumate.coreapi.entity;
 
-import com.vivumate.coreapi.enums.AuthProvider;
-import com.vivumate.coreapi.enums.Gender;
-import com.vivumate.coreapi.enums.UserStatus;
+import com.vivumate.coreapi.entity.enums.AuthProvider;
+import com.vivumate.coreapi.entity.enums.Gender;
+import com.vivumate.coreapi.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Nationalized;

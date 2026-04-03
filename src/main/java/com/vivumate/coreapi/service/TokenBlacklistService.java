@@ -1,6 +1,6 @@
 package com.vivumate.coreapi.service;
 
-import com.vivumate.coreapi.enums.TokenType;
+import com.vivumate.coreapi.entity.enums.TokenType;
 import com.vivumate.coreapi.security.JwtUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;

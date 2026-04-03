@@ -6,7 +6,7 @@ import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.service.AuthenticationService;
-import com.vivumate.coreapi.utils.Translator;
+import com.vivumate.coreapi.util.Translator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;

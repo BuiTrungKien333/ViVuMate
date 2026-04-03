@@ -6,7 +6,7 @@ import com.vivumate.coreapi.dto.response.PageResponse;
 import com.vivumate.coreapi.dto.response.UserMiniResponse;
 import com.vivumate.coreapi.dto.response.UserResponse;
 import com.vivumate.coreapi.entity.User;
-import com.vivumate.coreapi.enums.UserStatus;
+import com.vivumate.coreapi.entity.enums.UserStatus;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.mapper.UserMapper;

@@ -1,6 +1,6 @@
 package com.vivumate.coreapi.entity;
 
-import com.vivumate.coreapi.enums.PermissionCode;
+import com.vivumate.coreapi.entity.enums.PermissionCode;
 import jakarta.persistence.*;
 import lombok.*;
 

@@ -1,10 +1,10 @@
 package com.vivumate.coreapi.security;
 
 import com.vivumate.coreapi.entity.User;
-import com.vivumate.coreapi.enums.TokenType;
+import com.vivumate.coreapi.entity.enums.TokenType;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.service.TokenBlacklistService;
-import com.vivumate.coreapi.utils.Translator;
+import com.vivumate.coreapi.util.Translator;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

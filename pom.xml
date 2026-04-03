@@ -12,7 +12,7 @@
 	<artifactId>core-api</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>ViVuMate</name>
-	<description>Backend ViVuMate with Java 21 and Spring Boot 3</description>
+	<description>Backend ViVuMate Chat realtime with Java 21 and Spring Boot 3</description>
 	<url/>
 	<licenses>
 		<license/>
