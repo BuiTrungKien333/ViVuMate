@@ -2,6 +2,7 @@ package com.vivumate.coreapi.repository.mongodb;
 
 import com.vivumate.coreapi.document.MessageDocument;
 import org.bson.types.ObjectId;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -25,10 +26,11 @@ public interface MessageRepository
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * Find a single message by ID, excluding soft-deleted-for-everyone messages.
+     * Find a single message by ID, ensuring it's not deleted for everyone
+     * AND not deleted for the requesting user.
      */
-    @Query("{ '_id': ?0, 'deleted_for_everyone': false }")
-    Optional<MessageDocument> findActiveById(ObjectId messageId);
+    @Query("{ '_id': ?0, 'deleted_for_everyone': false, 'deleted_for': { $ne: ?1 } }")
+    Optional<MessageDocument> findActiveByIdAndUserId(ObjectId messageId, Long currentUserId);
 
     /**
      * Find the latest message in a conversation.
@@ -44,8 +46,10 @@ public interface MessageRepository
     long countByConversationIdAndDeletedForEveryoneIsFalse(ObjectId conversationId);
 
     /**
-     * Find all messages in a conversation from a specific sender.
+     * Find messages in a conversation from a specific sender, with pagination.
      */
-    @Query("{ 'conversation_id': ?0, 'sender.user_id': ?1, 'deleted_for_everyone': false }")
-    List<MessageDocument> findBySenderInConversation(ObjectId conversationId, Long senderUserId);
+    @Query("{ 'conversation_id': ?0, 'sender.user_id': ?1, 'deleted_for_everyone': false, 'deleted_for': { $ne: ?2 } }")
+    List<MessageDocument> findBySenderInConversation(
+            ObjectId conversationId, Long senderUserId, Long currentUserId, Pageable pageable
+    );
 }

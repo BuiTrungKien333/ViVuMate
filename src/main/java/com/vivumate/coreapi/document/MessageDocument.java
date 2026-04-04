@@ -6,6 +6,7 @@ import lombok.*;
 import org.bson.types.ObjectId;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.TextScore;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +49,9 @@ import java.util.List;
 @Document(collection = "messages")
 public class MessageDocument extends BaseDocument {
 
-    /** Reference to the parent conversation. */
+    /**
+     * Reference to the parent conversation.
+     */
     private ObjectId conversationId;
 
     // ═══════════════════════════════════════════════════════════
@@ -66,24 +69,39 @@ public class MessageDocument extends BaseDocument {
     // CONTENT — (Polymorphic Pattern)
     // ═══════════════════════════════════════════════════════════
 
-    /** Discriminator field for the polymorphic content shape. */
+    /**
+     * Discriminator field for the polymorphic content shape.
+     */
     private ContentType contentType;
 
-    /** Polymorphic content — shape varies based on {@code contentType}. */
+    /**
+     * Polymorphic content — shape varies based on {@code contentType}.
+     */
     private MessageContent content;
+
+    /**
+     * (Relevance score when using Full-text Search.
+     * Not saved to DB, only used for reading results.)
+     */
+    @TextScore
+    private Float score;
 
     // ═══════════════════════════════════════════════════════════
     // REPLIES
     // ═══════════════════════════════════════════════════════════
 
-    /** Preview of the message this is a direct reply to. Null if not a reply. */
+    /**
+     * Preview of the message this is a direct reply to. Null if not a reply.
+     */
     private ReplyToSnapshot replyTo;
 
     // ═══════════════════════════════════════════════════════════
     // MENTIONS
     // ═══════════════════════════════════════════════════════════
 
-    /** List of @mentions found in the message text. */
+    /**
+     * List of @mentions found in the message text.
+     */
     @Builder.Default
     private List<Mention> mentions = new ArrayList<>();
 
@@ -91,7 +109,9 @@ public class MessageDocument extends BaseDocument {
     // EDIT HISTORY
     // ═══════════════════════════════════════════════════════════
 
-    /** Whether this message has been edited at least once. */
+    /**
+     * Whether this message has been edited at least once.
+     */
     @Builder.Default
     @Field("is_edited")
     private boolean edited = false;
@@ -113,7 +133,9 @@ public class MessageDocument extends BaseDocument {
     @Builder.Default
     private List<Long> deletedFor = new ArrayList<>();
 
-    /** If true, message is hidden for all participants ("delete for everyone"). */
+    /**
+     * If true, message is hidden for all participants ("delete for everyone").
+     */
     @Builder.Default
     private boolean deletedForEveryone = false;
 }

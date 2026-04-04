@@ -39,7 +39,23 @@ public enum ErrorCode {
     WEATHER_API_ERROR(2001, "error.weather.api", HttpStatus.BAD_GATEWAY),
     WEATHER_DATA_PARSE_ERROR(2002, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR),
 
-    EMAIL_SEND_FAILED(3001, "error.email.send_failed", HttpStatus.INTERNAL_SERVER_ERROR);
+    EMAIL_SEND_FAILED(3001, "error.email.send_failed", HttpStatus.INTERNAL_SERVER_ERROR),
+
+    // 4xxx: Chat
+    CONVERSATION_NOT_FOUND(4001, "error.chat.conversation.notfound", HttpStatus.NOT_FOUND),
+    CONVERSATION_ALREADY_EXISTS(4002, "error.chat.conversation.already_exists", HttpStatus.CONFLICT),
+    CONVERSATION_MEMBER_LIMIT(4003, "error.chat.conversation.member_limit", HttpStatus.BAD_REQUEST),
+    CONVERSATION_INVALID_MEMBER_COUNT(4004, "error.chat.conversation.invalid_member_count", HttpStatus.BAD_REQUEST),
+    CONVERSATION_NOT_GROUP(4005, "error.chat.conversation.not_group", HttpStatus.BAD_REQUEST),
+    CONVERSATION_ACCESS_DENIED(4006, "error.chat.conversation.access_denied", HttpStatus.FORBIDDEN),
+    CONVERSATION_ADMIN_REQUIRED(4007, "error.chat.conversation.admin_required", HttpStatus.FORBIDDEN),
+    PARTICIPANT_ALREADY_EXISTS(4008, "error.chat.participant.already_exists", HttpStatus.CONFLICT),
+    PARTICIPANT_NOT_FOUND(4009, "error.chat.participant.notfound", HttpStatus.NOT_FOUND),
+
+    MESSAGE_NOT_FOUND(4101, "error.chat.message.notfound", HttpStatus.NOT_FOUND),
+    MESSAGE_EDIT_DENIED(4102, "error.chat.message.edit_denied", HttpStatus.FORBIDDEN),
+    MESSAGE_RECALL_DENIED(4103, "error.chat.message.recall_denied", HttpStatus.FORBIDDEN),
+    CANNOT_DM_SELF(4104, "error.chat.dm.self", HttpStatus.BAD_REQUEST);
 
     private final int code;
     private final String messageKey;

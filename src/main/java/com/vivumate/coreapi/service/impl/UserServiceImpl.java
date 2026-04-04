@@ -10,8 +10,8 @@ import com.vivumate.coreapi.entity.enums.UserStatus;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.mapper.UserMapper;
-import com.vivumate.coreapi.repository.RoleRepository;
 import com.vivumate.coreapi.repository.UserRepository;
+import com.vivumate.coreapi.service.ChatSyncService;
 import com.vivumate.coreapi.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +23,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,7 +37,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final RoleRepository roleRepository;
+    private final ChatSyncService chatSyncService;
 
     // ========= READ ===========
     private User getAuthenticatedUser() {
@@ -120,24 +122,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse updateMyProfile(UserUpdateRequest request) {
         User user = getCurrentUserManaged();
-
-        if (request.getFullName() != null)
-            user.setFullName(request.getFullName());
-        if (request.getBio() != null)
-            user.setBio(request.getBio());
-        if (request.getAvatarUrl() != null)
-            user.setAvatarUrl(request.getAvatarUrl());
-        if (request.getCoverUrl() != null)
-            user.setCoverUrl(request.getCoverUrl());
-        if (request.getGender() != null)
-            user.setGender(request.getGender());
-        if (request.getDateOfBirth() != null)
-            user.setDateOfBirth(request.getDateOfBirth());
-
-        User savedUser = userRepository.save(user);
-        log.info("User {} updated profile", user.getUsername());
-
-        return UserMapper.toUserResponse(savedUser);
+        return applyUpdatesAndSave(user, request);
     }
 
     @Transactional
@@ -198,24 +183,7 @@ public class UserServiceImpl implements UserService {
     public UserResponse updateUser(Long id, UserUpdateRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
-
-        if (request.getFullName() != null)
-            user.setFullName(request.getFullName());
-        if (request.getBio() != null)
-            user.setBio(request.getBio());
-        if (request.getAvatarUrl() != null)
-            user.setAvatarUrl(request.getAvatarUrl());
-        if (request.getCoverUrl() != null)
-            user.setCoverUrl(request.getCoverUrl());
-        if (request.getGender() != null)
-            user.setGender(request.getGender());
-        if (request.getDateOfBirth() != null)
-            user.setDateOfBirth(request.getDateOfBirth());
-
-        User savedUser = userRepository.save(user);
-        log.info("Updated user: {}", savedUser.getUsername());
-
-        return UserMapper.toUserResponse(savedUser);
+        return applyUpdatesAndSave(user, request);
     }
 
     @Transactional
@@ -249,6 +217,44 @@ public class UserServiceImpl implements UserService {
         user.setStatus(user.getStatus() == UserStatus.ACTIVE ? UserStatus.BANNED : UserStatus.ACTIVE);
         userRepository.save(user);
         log.info("User {} status changed to {}", user.getUsername(), user.getStatus());
+    }
+
+    private UserResponse applyUpdatesAndSave(User user, UserUpdateRequest request) {
+        boolean needMongoSync = false;
+
+        if (request.getFullName() != null && !request.getFullName().equals(user.getFullName())) {
+            user.setFullName(request.getFullName());
+            needMongoSync = true;
+        }
+
+        if (request.getAvatarUrl() != null && !request.getAvatarUrl().equals(user.getAvatarUrl())) {
+            user.setAvatarUrl(request.getAvatarUrl());
+            needMongoSync = true;
+        }
+
+        if (request.getBio() != null) user.setBio(request.getBio());
+        if (request.getCoverUrl() != null) user.setCoverUrl(request.getCoverUrl());
+        if (request.getGender() != null) user.setGender(request.getGender());
+        if (request.getDateOfBirth() != null) user.setDateOfBirth(request.getDateOfBirth());
+
+        User savedUser = userRepository.save(user);
+        log.info("Updated user: {}", savedUser.getUsername());
+
+        if (needMongoSync) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    log.info("Postgres commit successful. Triggering MongoDB sync in background...");
+                    chatSyncService.syncUserProfileToMongoDB(
+                            savedUser.getId(),
+                            savedUser.getFullName(),
+                            savedUser.getAvatarUrl()
+                    );
+                }
+            });
+        }
+
+        return UserMapper.toUserResponse(savedUser);
     }
 
 }

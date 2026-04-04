@@ -6,6 +6,7 @@ import com.vivumate.coreapi.document.subdoc.MessageContent;
 import com.mongodb.client.result.UpdateResult;
 import org.bson.types.ObjectId;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -38,10 +39,11 @@ public interface MessageCustomRepository {
      * @param currentUserId  the requesting user's PostgreSQL ID (for filtering deleted_for)
      * @param cursor         ObjectId of the last message from the previous page (null for first page)
      * @param pageSize       number of messages per page (recommended: 30)
+     * @param clearedAt      Save time to delete user's chat history
      * @return messages sorted newest-first
      */
     List<MessageDocument> findMessagesByConversation(
-            ObjectId conversationId, Long currentUserId, ObjectId cursor, int pageSize
+            ObjectId conversationId, Long currentUserId, ObjectId cursor, Instant clearedAt, int pageSize
     );
 
     // ═══════════════════════════════════════════════════════════
@@ -57,8 +59,9 @@ public interface MessageCustomRepository {
      * @param pageSize       max results to return
      * @return messages matching the keyword, sorted by text relevance score
      */
-    List<MessageDocument> searchMessages(ObjectId conversationId, String keyword, int pageSize);
-
+    List<MessageDocument> searchMessages(
+            ObjectId conversationId, Long currentUserId, Instant clearedAt, String keyword, int pageSize
+    );
     // ═══════════════════════════════════════════════════════════
     //  MESSAGE EDITING
     // ═══════════════════════════════════════════════════════════
@@ -109,11 +112,12 @@ public interface MessageCustomRepository {
      * Only updates messages from the last {@code recentDays} days to avoid
      * excessive write amplification. Older messages keep their historical snapshot.
      *
-     * @param userId    the PostgreSQL user ID
-     * @param fullName  updated display name
-     * @param avatarUrl updated avatar URL
+     * @param userId     the PostgreSQL user ID
+     * @param fullName   updated display name
+     * @param avatarUrl  updated avatar URL
      * @param recentDays number of days to look back (recommended: 30)
+     * @param groupIds   Only update messages belonging to the group.
      * @return number of messages updated
      */
-    long updateSenderSnapshot(Long userId, String fullName, String avatarUrl, int recentDays);
+    long updateSenderSnapshot(Long userId, String fullName, String avatarUrl, int recentDays, List<ObjectId> groupIds);
 }

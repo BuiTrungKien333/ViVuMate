@@ -51,11 +51,11 @@ public class MongoIndexConfig {
                 .on("_id", Sort.Direction.DESC)
                 .named("idx_conversation_messages_cursor"));
 
-        // TODO: bỏ lên gemini tìm idx_sender_messages xong nghe nó giải thích
-//        messageOps.ensureIndex(new Index()
-//                .on("sender.user_id", Sort.Direction.ASC)
-//                .on("created_at", Sort.Direction.DESC)
-//                .named("idx_sender_messages"));
+        messageOps.ensureIndex(new Index()
+                .on("sender.user_id", Sort.Direction.ASC)
+                .on("conversation_id", Sort.Direction.ASC)
+                .on("_id", Sort.Direction.DESC)
+                .named("idx_sender_messages"));
 
         // 2.1 Full-text Search Index on field content.text of a conversation
         Document compoundTextIndex = new Document("conversation_id", 1)

@@ -69,4 +69,7 @@ public interface ConversationRepository
      */
     @Query("{ '_id': ?0, 'participant_ids': ?1, 'deleted_at': null }")
     Optional<ConversationDocument> findByIdAndParticipantId(ObjectId conversationId, Long userId);
+
+    @Query(value = "{ 'participant_ids': ?0, 'type': 'GROUP', 'deleted_at': null }", fields = "{ '_id': 1 }")
+    List<ConversationDocument> findGroupIdsByUserId(Long userId);
 }

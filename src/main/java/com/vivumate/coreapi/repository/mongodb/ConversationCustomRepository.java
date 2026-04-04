@@ -92,7 +92,12 @@ public interface ConversationCustomRepository {
      * Atomically pushes to both {@code participants} and {@code participant_ids},
      * and increments {@code member_count}.
      */
-    UpdateResult addParticipant(ObjectId conversationId, Participant participant);
+    /**
+     * Add a participant with max capacity check.
+     * Uses atomic {@code $push + $inc} with query predicate {@code memberCount < maxMembers}
+     * to prevent group from exceeding limit. If group is full, modifiedCount = 0.
+     */
+    UpdateResult addParticipant(ObjectId conversationId, Participant participant, int maxMembers);
 
     /**
      * Remove a participant from a GROUP conversation.
@@ -131,4 +136,15 @@ public interface ConversationCustomRepository {
      * Soft-delete a conversation by setting {@code deleted_at}.
      */
     UpdateResult softDelete(ObjectId conversationId);
+
+    // ═══════════════════════════════════════════════════════════
+    //  CLEAR HISTORY — Watermark Pattern
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Set {@code clearedAt} timestamp for a participant.
+     * When loading messages, only show messages with {@code _id > clearedAt}.
+     * Does NOT delete any data — just sets a watermark.
+     */
+    UpdateResult updateClearedAt(ObjectId conversationId, Long userId, Instant clearedAt);
 }

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -42,7 +43,7 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
 
     @Override
     public List<MessageDocument> findMessagesByConversation(
-            ObjectId conversationId, Long currentUserId, ObjectId cursor, int pageSize) {
+            ObjectId conversationId, Long currentUserId, ObjectId cursor, Instant clearedAt, int pageSize) {
 
         Criteria criteria = Criteria.where("conversationId").is(conversationId)
                 .and("deletedForEveryone").is(false)
@@ -51,6 +52,16 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
         // Cursor-based: fetch messages with _id < cursor (older messages)
         if (cursor != null) {
             criteria = criteria.and("_id").lt(cursor);
+        }
+
+        if (clearedAt != null) {
+            ObjectId minId = new ObjectId(Date.from(clearedAt));
+
+            if (cursor != null) {
+                criteria.gt(minId); // _id < cursor AND _id > minId
+            } else {
+                criteria = criteria.and("_id").gt(minId);
+            }
         }
 
         Query query = new Query(criteria)
@@ -65,14 +76,22 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public List<MessageDocument> searchMessages(ObjectId conversationId, String keyword, int pageSize) {
+    public List<MessageDocument> searchMessages(ObjectId conversationId, Long currentUserId, Instant clearedAt, String keyword, int pageSize) {
         // Combine text search with conversation scope
         TextCriteria textCriteria = TextCriteria.forDefaultLanguage().matching(keyword);
 
+        Criteria additionalCriteria = Criteria.where("conversationId").is(conversationId)
+                .and("deletedForEveryone").is(false)
+                .and("deletedFor").ne(currentUserId);
+
+        if (clearedAt != null) {
+            ObjectId minId = new ObjectId(Date.from(clearedAt));
+            additionalCriteria = additionalCriteria.and("_id").gt(minId);
+        }
+
         Query query = TextQuery.queryText(textCriteria)
                 .sortByScore()
-                .addCriteria(Criteria.where("conversationId").is(conversationId)
-                        .and("deletedForEveryone").is(false))
+                .addCriteria(additionalCriteria)
                 .limit(pageSize);
 
         // Include text score for relevance ranking
@@ -89,7 +108,7 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
     public UpdateResult editMessage(ObjectId messageId, Long senderUserId,
                                     MessageContent newContent, EditHistoryEntry historyEntry) {
         // Ownership check is part of the query predicate (not in app code)
-        // This prevents TOCTOU: if sender doesn't match, modifiedCount = 0
+        // This prevents TOCTOU (Time-Of-Check to Time-Of-Use): if sender doesn't match, modifiedCount = 0
         Query query = new Query(Criteria.where("_id").is(messageId)
                 .and("sender.userId").is(senderUserId)
                 .and("deletedForEveryone").is(false));
@@ -128,7 +147,10 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
         Update update = new Update()
                 .set("deletedForEveryone", true)
                 .set("deletedAt", Instant.now())
-                .set("updatedAt", Instant.now());
+                .set("updatedAt", Instant.now())
+                .unset("content")
+                .unset("mentions")
+                .unset("replyTo");
 
         return mongoTemplate.updateFirst(query, update, MessageDocument.class);
     }
@@ -138,7 +160,10 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public long updateSenderSnapshot(Long userId, String fullName, String avatarUrl, int recentDays) {
+    public long updateSenderSnapshot(Long userId, String fullName, String avatarUrl, int recentDays, List<ObjectId> groupIds) {
+        if (groupIds == null || groupIds.isEmpty())
+            return 0;
+
         // Only update recent messages to limit write amplification
         Instant cutoff = Instant.now().minus(recentDays, ChronoUnit.DAYS);
 
@@ -146,6 +171,7 @@ public class MessageCustomRepositoryImpl implements MessageCustomRepository {
         ObjectId cutoffId = new ObjectId(java.util.Date.from(cutoff));
 
         Query query = new Query(Criteria.where("sender.userId").is(userId)
+                .and("conversationId").in(groupIds)
                 .and("_id").gte(cutoffId));
 
         Update update = new Update()

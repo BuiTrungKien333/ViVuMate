@@ -147,14 +147,18 @@ public class ConversationCustomRepositoryImpl implements ConversationCustomRepos
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public UpdateResult addParticipant(ObjectId conversationId, Participant participant) {
-        Query query = new Query(Criteria.where("_id").is(conversationId));
+    public UpdateResult addParticipant(ObjectId conversationId, Participant participant, int maxMembers) {
+        // Atomic capacity check: only update if memberCount < maxMembers
+        // If group is full, the query matches 0 docs → modifiedCount = 0
+        Query query = new Query(Criteria.where("_id").is(conversationId)
+                .and("memberCount").lt(maxMembers));
 
         Update update = new Update()
                 .push("participants", participant)
                 .addToSet("participantIds", participant.getUserId())
                 .inc("memberCount", 1)
                 .set("unreadCounts." + participant.getUserId(), 0)
+                .set("unreadMentions." + participant.getUserId(), 0)
                 .set("updatedAt", Instant.now());
 
         return mongoTemplate.updateFirst(query, update, ConversationDocument.class);
@@ -229,6 +233,24 @@ public class ConversationCustomRepositoryImpl implements ConversationCustomRepos
 
         Update update = new Update()
                 .set("deletedAt", Instant.now())
+                .set("updatedAt", Instant.now());
+
+        return mongoTemplate.updateFirst(query, update, ConversationDocument.class);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  CLEAR HISTORY — Watermark Pattern
+    // ═══════════════════════════════════════════════════════════
+
+    @Override
+    public UpdateResult updateClearedAt(ObjectId conversationId, Long userId, Instant clearedAt) {
+        Query query = new Query(Criteria.where("_id").is(conversationId)
+                .and("participants.userId").is(userId));
+
+        Update update = new Update()
+                .set("participants.$.clearedAt", clearedAt)
+                .set("unreadCounts." + userId, 0)
+                .set("unreadMentions." + userId, 0)
                 .set("updatedAt", Instant.now());
 
         return mongoTemplate.updateFirst(query, update, ConversationDocument.class);
