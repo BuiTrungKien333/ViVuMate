@@ -93,6 +93,9 @@ public class ConversationDocument extends BaseDocument {
     @Builder.Default
     private Map<String, Integer> unreadCounts = new HashMap<>();
 
+    @Builder.Default
+    private Map<String, Integer> unreadMentions = new HashMap<>();
+
     // ═══════════════════════════════════════════════════════════
     // LAST MESSAGE PREVIEW — (Subset Pattern)
     // ═══════════════════════════════════════════════════════════

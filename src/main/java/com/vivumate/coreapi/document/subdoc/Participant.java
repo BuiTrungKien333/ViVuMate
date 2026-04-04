@@ -39,4 +39,11 @@ public class Participant {
 
     /** If muted temporarily, the mute expiry time. */
     private Instant mutedUntil;
+
+    /**
+     * Timestamp when this user clicked "Delete history".
+     * Only query messages where created_at > clearedAt.
+     */
+    private Instant clearedAt;
+
 }

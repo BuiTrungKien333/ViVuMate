@@ -29,6 +29,7 @@ public class MongoIndexConfig {
         conversationOps.ensureIndex(new Index()
                 .on("participant_ids", Sort.Direction.ASC)
                 .on("last_activity_at", Sort.Direction.DESC)
+                .on("_id", Sort.Direction.DESC)
                 .named("idx_user_conversations_latest"));
 
         conversationOps.ensureIndex(new Index()

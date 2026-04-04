@@ -15,21 +15,26 @@ import java.util.List;
  * <p>
  * <b>Patterns applied:</b>
  * <ul>
- *   <li><b>Polymorphic Pattern</b> — {@code contentType} + {@code content} sub-document
- *       adapts shape for TEXT, IMAGE, FILE, VIDEO, AUDIO, LINK_PREVIEW, SYSTEM</li>
- *   <li><b>Extended Reference</b> — {@code sender} embeds a lightweight user snapshot</li>
+ * <li><b>Polymorphic Pattern</b> — {@code contentType} + {@code content}
+ * sub-document
+ * adapts shape for TEXT, IMAGE, FILE, VIDEO, AUDIO, LINK_PREVIEW, SYSTEM</li>
+ * <li><b>Extended Reference</b> — {@code sender} embeds a lightweight user
+ * snapshot</li>
  * </ul>
  *
  * <b>Indexes:</b>
  * <ol>
- *   <li>{@code {conversation_id: 1, _id: -1}} — hot path: cursor-based message pagination</li>
- *   <li>{@code {thread_root_id: 1, _id: 1}} — partial: load thread replies</li>
- *   <li>{@code {content.text: "text"}} — full-text search on message content</li>
- *   <li>{@code {conversation_id: 1, mentions.user_id: 1}} — partial: find mentions</li>
- *   <li>{@code {sender.user_id: 1, created_at: -1}} — user's sent messages</li>
+ * <li>{@code {conversation_id: 1, _id: -1}} — hot path: cursor-based message
+ * pagination</li>
+ * <li>{@code {thread_root_id: 1, _id: 1}} — partial: load thread replies</li>
+ * <li>{@code {content.text: "text"}} — full-text search on message content</li>
+ * <li>{@code {conversation_id: 1, mentions.user_id: 1}} — partial: find
+ * mentions</li>
+ * <li>{@code {sender.user_id: 1, created_at: -1}} — user's sent messages</li>
  * </ol>
  *
- * <b>Shard key recommendation:</b> {@code {conversation_id: "hashed"}} to co-locate
+ * <b>Shard key recommendation:</b> {@code {conversation_id: "hashed"}} to
+ * co-locate
  * all messages of a conversation on the same shard.
  *
  * @see MessageContent
@@ -47,17 +52,18 @@ public class MessageDocument extends BaseDocument {
     private ObjectId conversationId;
 
     // ═══════════════════════════════════════════════════════════
-    //  SENDER — (Extended Reference Pattern)
+    // SENDER — (Extended Reference Pattern)
     // ═══════════════════════════════════════════════════════════
 
     /**
      * Denormalized sender snapshot. Avoids $lookup on the hot message-feed path.
-     * Updated via async background job when user changes profile (eventually consistent).
+     * Updated via async background job when user changes profile (eventually
+     * consistent).
      */
     private SenderSnapshot sender;
 
     // ═══════════════════════════════════════════════════════════
-    //  CONTENT — (Polymorphic Pattern)
+    // CONTENT — (Polymorphic Pattern)
     // ═══════════════════════════════════════════════════════════
 
     /** Discriminator field for the polymorphic content shape. */
@@ -67,14 +73,14 @@ public class MessageDocument extends BaseDocument {
     private MessageContent content;
 
     // ═══════════════════════════════════════════════════════════
-    //  THREADING / REPLIES
+    // REPLIES
     // ═══════════════════════════════════════════════════════════
 
     /** Preview of the message this is a direct reply to. Null if not a reply. */
     private ReplyToSnapshot replyTo;
 
     // ═══════════════════════════════════════════════════════════
-    //  MENTIONS
+    // MENTIONS
     // ═══════════════════════════════════════════════════════════
 
     /** List of @mentions found in the message text. */
@@ -82,7 +88,7 @@ public class MessageDocument extends BaseDocument {
     private List<Mention> mentions = new ArrayList<>();
 
     // ═══════════════════════════════════════════════════════════
-    //  EDIT HISTORY
+    // EDIT HISTORY
     // ═══════════════════════════════════════════════════════════
 
     /** Whether this message has been edited at least once. */
@@ -97,7 +103,7 @@ public class MessageDocument extends BaseDocument {
     private EditHistoryEntry previousEdit;
 
     // ═══════════════════════════════════════════════════════════
-    //  SOFT DELETE
+    // SOFT DELETE
     // ═══════════════════════════════════════════════════════════
 
     /**
