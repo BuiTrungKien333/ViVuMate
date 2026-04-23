@@ -11,6 +11,7 @@ public enum ErrorCode {
     // 9xxx: System
 
     UNCATEGORIZED_EXCEPTION(9999, "error.internal", HttpStatus.INTERNAL_SERVER_ERROR),
+    INTERNAL_SERVER_ERROR(9000, "error.internal.server", HttpStatus.INTERNAL_SERVER_ERROR),
 
     INVALID_INPUT(1001, "error.validation", HttpStatus.BAD_REQUEST),
     UNAUTHORIZED(1002, "error.unauthorized", HttpStatus.UNAUTHORIZED),

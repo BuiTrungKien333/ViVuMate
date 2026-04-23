@@ -5,7 +5,6 @@ import com.vivumate.coreapi.document.subdoc.ConversationSettings;
 import com.vivumate.coreapi.document.subdoc.LastMessagePreview;
 import com.vivumate.coreapi.document.subdoc.Participant;
 import lombok.*;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
@@ -126,7 +125,6 @@ public class ConversationDocument extends BaseDocument {
      * Used with a unique sparse index to prevent duplicate DM creation.
      * Null for GROUP conversations.
      */
-    @Indexed(unique = true, sparse = true, name = "idx_dm_hash_unique")
     private String dmHash;
 
     /** PostgreSQL user ID of the conversation creator. */

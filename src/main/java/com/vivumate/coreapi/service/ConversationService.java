@@ -1,6 +1,7 @@
 package com.vivumate.coreapi.service;
 
 import com.vivumate.coreapi.document.ConversationDocument;
+import com.vivumate.coreapi.document.enums.JoinMethod;
 import org.bson.types.ObjectId;
 
 import java.time.Instant;
@@ -44,7 +45,7 @@ public interface ConversationService {
     //  MEMBER MANAGEMENT (GROUP only)
     // ═══════════════════════════════════════════════════════════
 
-    void addMember(ObjectId conversationId, Long adminUserId, Long newMemberUserId);
+    void addMembers(ObjectId conversationId, Long adminUserId, List<Long> inputMemberIds, JoinMethod method);
 
     void removeMember(ObjectId conversationId, Long adminUserId, Long targetUserId);
 

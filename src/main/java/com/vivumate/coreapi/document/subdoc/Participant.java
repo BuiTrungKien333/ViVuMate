@@ -1,5 +1,6 @@
 package com.vivumate.coreapi.document.subdoc;
 
+import com.vivumate.coreapi.document.enums.JoinMethod;
 import com.vivumate.coreapi.document.enums.ParticipantRole;
 import lombok.*;
 
@@ -45,5 +46,11 @@ public class Participant {
      * Only query messages where created_at > clearedAt.
      */
     private Instant clearedAt;
+
+    private Long addedByUserId;
+
+    private String addedByFullName;
+
+    private JoinMethod joinMethod;
 
 }

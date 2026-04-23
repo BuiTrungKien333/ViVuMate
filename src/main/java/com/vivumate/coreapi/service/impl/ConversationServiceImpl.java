@@ -2,6 +2,7 @@ package com.vivumate.coreapi.service.impl;
 
 import com.vivumate.coreapi.document.ConversationDocument;
 import com.vivumate.coreapi.document.enums.ConversationType;
+import com.vivumate.coreapi.document.enums.JoinMethod;
 import com.vivumate.coreapi.document.enums.ParticipantRole;
 import com.vivumate.coreapi.document.subdoc.ConversationSettings;
 import com.vivumate.coreapi.document.subdoc.Participant;
@@ -14,12 +15,11 @@ import com.vivumate.coreapi.service.ConversationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -56,19 +56,28 @@ public class ConversationServiceImpl implements ConversationService {
 
         String dmHash = buildDmHash(currentUserId, otherUserId);
 
-        // Idempotent: return existing DM if it already exists
-        return conversationRepository.findByDmHash(dmHash)
-                .orElseGet(() -> createDirectMessage(currentUserId, otherUserId, dmHash));
+        Optional<ConversationDocument> existingDm = conversationRepository.findByDmHash(dmHash);
+        if (existingDm.isPresent()) {
+            return existingDm.get();
+        }
+
+        try {
+            return createDirectMessage(currentUserId, otherUserId, dmHash);
+        } catch (DuplicateKeyException e) {
+            log.info("Concurrent DM creation detected for hash {}. Fetching the newly created one.", dmHash);
+            return conversationRepository.findByDmHash(dmHash)
+                    .orElseThrow(() -> new AppException(ErrorCode.INTERNAL_SERVER_ERROR));
+        }
     }
 
     @Override
     public ConversationDocument createGroupConversation(Long creatorUserId, String groupName,
-                                                         String groupAvatarUrl, List<Long> memberIds) {
+                                                        String groupAvatarUrl, List<Long> memberIds) {
         // Ensure creator is included in member list
-        List<Long> allMemberIds = new ArrayList<>(memberIds);
-        if (!allMemberIds.contains(creatorUserId)) {
-            allMemberIds.addFirst(creatorUserId);
-        }
+        Set<Long> uniqueMemberIds = new LinkedHashSet<>(memberIds);
+        uniqueMemberIds.add(creatorUserId);
+
+        List<Long> allMemberIds = new ArrayList<>(uniqueMemberIds);
 
         if (allMemberIds.size() < MIN_GROUP_MEMBERS) {
             throw new AppException(ErrorCode.CONVERSATION_INVALID_MEMBER_COUNT);
@@ -79,9 +88,11 @@ public class ConversationServiceImpl implements ConversationService {
 
         // Fetch user snapshots from PostgreSQL (source of truth)
         Map<Long, UserMiniResponse> userMap = fetchUserMap(allMemberIds);
-
         Instant now = Instant.now();
         List<Participant> participants = new ArrayList<>();
+
+        Map<String, Integer> initUnreadCounts = new HashMap<>();
+
         for (Long memberId : allMemberIds) {
             UserMiniResponse user = userMap.get(memberId);
             if (user == null) {
@@ -108,9 +119,14 @@ public class ConversationServiceImpl implements ConversationService {
                 .lastActivityAt(now)
                 .settings(ConversationSettings.builder().build())
                 .createdBy(creatorUserId)
+                .unreadCounts(initUnreadCounts)
+                .unreadMentions(initUnreadCounts)
                 .build();
 
         ConversationDocument saved = conversationRepository.save(conversation);
+
+        // TODO: Call MessageService to create System Message: "User X created the group"
+
         log.info("Group conversation created: id={}, name='{}', members={}",
                 saved.getId(), groupName, allMemberIds.size());
         return saved;
@@ -122,7 +138,7 @@ public class ConversationServiceImpl implements ConversationService {
 
     @Override
     public List<ConversationDocument> getConversationList(Long userId, Instant cursorActivityAt,
-                                                           ObjectId cursorId, int pageSize) {
+                                                          ObjectId cursorId, int pageSize) {
         return conversationRepository.findConversationsByUserId(userId, cursorActivityAt, cursorId, pageSize);
     }
 
@@ -137,36 +153,72 @@ public class ConversationServiceImpl implements ConversationService {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public void addMember(ObjectId conversationId, Long adminUserId, Long newMemberUserId) {
-        ConversationDocument conversation = getConversationAndValidateGroup(conversationId, adminUserId);
-        validateAdmin(conversation, adminUserId);
+    public void addMembers(ObjectId conversationId, Long inviterId, List<Long> inputMemberIds, JoinMethod method) {
+        ConversationDocument conversation = getConversationAndValidateGroup(conversationId, inviterId);
+        validateAdminCanAddMember(conversation, inviterId);
 
-        // Check if user is already a participant
-        if (conversation.getParticipantIds().contains(newMemberUserId)) {
-            throw new AppException(ErrorCode.PARTICIPANT_ALREADY_EXISTS);
+        // Filter duplicate IDs from input
+        Set<Long> uniqueInputIds = new LinkedHashSet<>(inputMemberIds);
+
+        // filter people already in group
+        Set<Long> existingIds = new HashSet<>(conversation.getParticipantIds());
+        List<Long> validIdsToAdd = uniqueInputIds.stream()
+                .filter(id -> !existingIds.contains(id))
+                .toList();
+
+        // If after filtering no one is left (everyone is already in) -> Exit successfully, no error
+        if (validIdsToAdd.isEmpty()) {
+            log.info("All requested users are already in the group. Ignoring.");
+            return;
+        }
+
+        if (conversation.getMemberCount() + validIdsToAdd.size() > MAX_GROUP_MEMBERS) {
+            throw new AppException(ErrorCode.CONVERSATION_MEMBER_LIMIT);
+        }
+
+        String inviterName = null;
+        if (inviterId != null && method == JoinMethod.ADDED_BY) {
+            inviterName = conversation.getParticipants().stream()
+                    .filter(p -> p.getUserId().equals(inviterId))
+                    .map(Participant::getFullName)
+                    .findFirst()
+                    .orElse("Unknown");
         }
 
         // Fetch user snapshot from PostgreSQL
-        UserMiniResponse newMember = fetchUser(newMemberUserId);
+        Map<Long, UserMiniResponse> userMap = fetchUserMap(validIdsToAdd);
+        Instant now = Instant.now();
+        final String finalInviterName = inviterName;
 
-        Participant participant = Participant.builder()
-                .userId(newMember.getId())
-                .username(newMember.getUsername())
-                .fullName(newMember.getFullName())
-                .avatarUrl(newMember.getAvatarUrl())
-                .role(ParticipantRole.MEMBER)
-                .joinedAt(Instant.now())
-                .build();
+        List<Participant> newParticipants = new ArrayList<>();
 
-        // Atomic capacity check: memberCount < MAX embedded in query predicate
-        long modified = conversationRepository.addParticipant(conversationId, participant, MAX_GROUP_MEMBERS)
-                .getModifiedCount();
+        for (Long id : validIdsToAdd) {
+            UserMiniResponse user = userMap.get(id);
+            if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
+
+            newParticipants.add(Participant.builder()
+                    .userId(user.getId())
+                    .username(user.getUsername())
+                    .fullName(user.getFullName())
+                    .avatarUrl(user.getAvatarUrl())
+                    .role(ParticipantRole.MEMBER)
+                    .joinedAt(now)
+                    .addedByUserId(inviterId)
+                    .addedByFullName(finalInviterName)
+                    .joinMethod(method)
+                    .build());
+        }
+
+        // Atomic capacity check: memberCount + size(input) < MAX embedded in query predicate
+        long modified = conversationRepository.addMultipleParticipants(
+                conversationId, newParticipants, validIdsToAdd, MAX_GROUP_MEMBERS
+        ).getModifiedCount();
 
         if (modified == 0) {
             throw new AppException(ErrorCode.CONVERSATION_MEMBER_LIMIT);
         }
 
-        log.info("Member added: conversationId={}, newMember={}, addedBy={}", conversationId, newMemberUserId, adminUserId);
+        log.info("Added {} members to group {}", validIdsToAdd.size(), conversationId);
 
         // TODO: Publish event for push notification (Spring ApplicationEvent or Message Queue)
         // eventPublisher.publishEvent(new MemberAddedEvent(conversationId, newMemberUserId, adminUserId));
@@ -312,7 +364,8 @@ public class ConversationServiceImpl implements ConversationService {
         List<Participant> participants = memberIds.stream()
                 .map(id -> {
                     UserMiniResponse user = userMap.get(id);
-                    if (user == null) throw new AppException(ErrorCode.USER_NOT_FOUND);
+                    if (user == null)
+                        throw new AppException(ErrorCode.USER_NOT_FOUND);
                     return Participant.builder()
                             .userId(user.getId())
                             .username(user.getUsername())
@@ -324,6 +377,11 @@ public class ConversationServiceImpl implements ConversationService {
                 })
                 .toList();
 
+        Map<String, Integer> initUnreadCounts = Map.of(
+                String.valueOf(currentUserId), 0,
+                String.valueOf(otherUserId), 0
+        );
+
         ConversationDocument conversation = ConversationDocument.builder()
                 .type(ConversationType.DIRECT)
                 .participants(participants)
@@ -332,6 +390,8 @@ public class ConversationServiceImpl implements ConversationService {
                 .lastActivityAt(now)
                 .dmHash(dmHash)
                 .createdBy(currentUserId)
+                .unreadCounts(initUnreadCounts)
+                .unreadMentions(initUnreadCounts)
                 .build();
 
         ConversationDocument saved = conversationRepository.save(conversation);
@@ -353,23 +413,16 @@ public class ConversationServiceImpl implements ConversationService {
     /**
      * Validate that the user has ADMIN role in the conversation.
      */
-    private void validateAdmin(ConversationDocument conversation, Long userId) {
-        boolean isAdmin = conversation.getParticipants().stream()
-                .anyMatch(p -> p.getUserId().equals(userId) && p.getRole() == ParticipantRole.ADMIN);
-        if (!isAdmin) {
-            throw new AppException(ErrorCode.CONVERSATION_ADMIN_REQUIRED);
-        }
-    }
+    private void validateAdminCanAddMember(ConversationDocument conversation, Long userId) {
+        if (conversation.getSettings().isJoinApprovalRequired()) {
+            boolean isAdmin = conversation.getParticipants().stream()
+                    .anyMatch(p -> p.getUserId().equals(userId) && p.getRole() == ParticipantRole.ADMIN);
 
-    /**
-     * Fetch a single user's snapshot from PostgreSQL.
-     */
-    private UserMiniResponse fetchUser(Long userId) {
-        List<UserMiniResponse> results = userRepository.findChatMembersByIds(List.of(userId));
-        if (results.isEmpty()) {
-            throw new AppException(ErrorCode.USER_NOT_FOUND);
+            if (!isAdmin) {
+                // TODO: create require to join group
+                throw new AppException(ErrorCode.CONVERSATION_ADMIN_REQUIRED);
+            }
         }
-        return results.getFirst();
     }
 
     /**

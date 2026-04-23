@@ -26,32 +26,32 @@ public class MongoIndexConfig {
         // 1. Indexes for CONVERSATIONS Collection
         IndexOperations conversationOps = mongoTemplate.indexOps("conversations");
 
-        conversationOps.ensureIndex(new Index()
+        conversationOps.createIndex(new Index()
                 .on("participant_ids", Sort.Direction.ASC)
                 .on("last_activity_at", Sort.Direction.DESC)
                 .on("_id", Sort.Direction.DESC)
                 .named("idx_user_conversations_latest"));
 
-        conversationOps.ensureIndex(new Index()
-                .on("type", Sort.Direction.ASC)
-                .on("last_activity_at", Sort.Direction.DESC)
-                .named("idx_type_activity"));
+//        conversationOps.createIndex(new Index()
+//                .on("type", Sort.Direction.ASC)
+//                .on("last_activity_at", Sort.Direction.DESC)
+//                .named("idx_type_activity"));
 
-        conversationOps.ensureIndex(new Index()
+        conversationOps.createIndex(new Index()
                 .on("dm_hash", Sort.Direction.ASC)
                 .unique()
-                .sparse() // Sparse: Bỏ qua (không index) các bản ghi có dm_hash là null (Group chat)
+                .sparse() // Sparse: NO index for records has dm_hash is null (Group chat)
                 .named("idx_dm_hash_unique"));
 
         // 2. Indexes for MESSAGES Collection
         IndexOperations messageOps = mongoTemplate.indexOps("messages");
 
-        messageOps.ensureIndex(new Index()
+        messageOps.createIndex(new Index()
                 .on("conversation_id", Sort.Direction.ASC)
                 .on("_id", Sort.Direction.DESC)
                 .named("idx_conversation_messages_cursor"));
 
-        messageOps.ensureIndex(new Index()
+        messageOps.createIndex(new Index()
                 .on("sender.user_id", Sort.Direction.ASC)
                 .on("conversation_id", Sort.Direction.ASC)
                 .on("_id", Sort.Direction.DESC)
@@ -65,14 +65,6 @@ public class MongoIndexConfig {
                 .name("idx_conversation_text_search")
                 .defaultLanguage("none");
         mongoTemplate.getCollection("messages").createIndex(compoundTextIndex, textIndexOptions);
-
-        // 2.3 Partial Index cho Mentions (Chỉ index nếu mảng mentions không rỗng)
-//        Document mentionFilter = new Document("mentions.0", new Document("$exists", true));
-//        messageOps.ensureIndex(new Index()
-//                .on("conversation_id", Sort.Direction.ASC)
-//                .on("mentions.user_id", Sort.Direction.ASC)
-//                .named("idx_mentions_partial")
-//                .partial(PartialIndexFilter.of(mentionFilter)));
 
         log.info("MongoDB Indexes initialized successfully.");
     }

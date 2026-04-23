@@ -93,11 +93,12 @@ public interface ConversationCustomRepository {
      * and increments {@code member_count}.
      */
     /**
-     * Add a participant with max capacity check.
+     * Add multi participant with max capacity check.
      * Uses atomic {@code $push + $inc} with query predicate {@code memberCount < maxMembers}
      * to prevent group from exceeding limit. If group is full, modifiedCount = 0.
      */
-    UpdateResult addParticipant(ObjectId conversationId, Participant participant, int maxMembers);
+    UpdateResult addMultipleParticipants(ObjectId conversationId, List<Participant> newParticipants,
+                                         List<Long> newParticipantIds, int maxMembers);
 
     /**
      * Remove a participant from a GROUP conversation.
