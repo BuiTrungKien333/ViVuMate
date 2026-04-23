@@ -45,21 +45,53 @@ public interface ConversationService {
     //  MEMBER MANAGEMENT (GROUP only)
     // ═══════════════════════════════════════════════════════════
 
+    /**
+     * Adds users to a group conversation.
+     * Only authorized admins can perform this action.
+     */
     void addMembers(ObjectId conversationId, Long adminUserId, List<Long> inputMemberIds, JoinMethod method);
 
-    void removeMember(ObjectId conversationId, Long adminUserId, Long targetUserId);
+    /**
+     * Removes users from a group conversation.
+     * Only authorized admins can perform this action.
+     */
+    void removeMembers(ObjectId conversationId, Long adminUserId, List<Long> inputMemberIds);
 
-    void leaveGroup(ObjectId conversationId, Long userId);
+    /**
+     * Allows a user to leave a group conversation.
+     * If the leaving user is an admin, a next admin may be required.
+     */
+    void leaveGroup(ObjectId conversationId, Long userId, Long nextAdminId);
 
     // ═══════════════════════════════════════════════════════════
     //  CONVERSATION ACTIONS
     // ═══════════════════════════════════════════════════════════
 
+    /**
+     * Clears the visible chat history for a specific user in a conversation.
+     */
     void clearHistory(ObjectId conversationId, Long userId);
 
+    /**
+     * Permanently dissolves a group conversation.
+     * Only authorized admins can perform this action.
+     */
     void dissolveGroup(ObjectId conversationId, Long adminUserId);
 
+    /**
+     * Mutes conversation notifications for a user for the given duration.
+     */
     void muteNotifications(ObjectId conversationId, Long userId, int durationInHours);
 
+    /**
+     * Marks the conversation as read for the specified user.
+     */
     void markAsRead(ObjectId conversationId, Long userId);
+
+    /**
+     * Changes or sets the display nickname of a user in a conversation.
+     */
+    void changeNickName(ObjectId conversationId, Long userId, String nickname);
+
+    void updateGroupInfo(ObjectId conversationId, Long currentUserId, String newName, String newAvatarUrl);
 }

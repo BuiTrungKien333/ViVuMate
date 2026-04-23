@@ -61,7 +61,7 @@ public class ConversationDocument extends BaseDocument {
 
     /**
      * Full participant details with user snapshots.
-     * Bounded: group limit ~500 members
+     * Bounded: group limit ~100 members
      */
     @Builder.Default
     private List<Participant> participants = new ArrayList<>();

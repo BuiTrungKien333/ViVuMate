@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ConversationServiceImpl implements ConversationService {
 
-    private static final int MAX_GROUP_MEMBERS = 500;
+    private static final int MAX_GROUP_MEMBERS = 100;
     private static final int MIN_GROUP_MEMBERS = 3;
 
     private final ConversationRepository conversationRepository;
@@ -225,44 +225,67 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    public void removeMember(ObjectId conversationId, Long adminUserId, Long targetUserId) {
+    public void removeMembers(ObjectId conversationId, Long adminUserId, List<Long> inputMemberIds) {
         ConversationDocument conversation = getConversationAndValidateGroup(conversationId, adminUserId);
-        validateAdmin(conversation, adminUserId);
+        validateAdminCanDeleteMembers(conversation, adminUserId);
 
-        // Admin cannot remove themselves via this method (use leaveGroup instead)
-        if (adminUserId.equals(targetUserId)) {
-            throw new AppException(ErrorCode.INVALID_INPUT);
+        // (Filter valid IDs (only remove people who are actually in the group))
+        Set<Long> existingIds = new HashSet<>(conversation.getParticipantIds());
+
+        List<Long> validIdsToRemove = inputMemberIds.stream()
+                .distinct()
+                .filter(existingIds::contains)
+                .filter(id -> !id.equals(adminUserId))
+                .toList();
+
+        if (validIdsToRemove.isEmpty()) {
+            log.info("No valid members to remove for conversationId={}", conversationId);
+            return;
         }
 
-        long modified = conversationRepository.removeParticipant(conversationId, targetUserId)
+        long modified = conversationRepository.removeParticipants(conversationId, validIdsToRemove)
                 .getModifiedCount();
 
         if (modified == 0) {
             throw new AppException(ErrorCode.PARTICIPANT_NOT_FOUND);
         }
 
-        log.info("Member removed: conversationId={}, target={}, removedBy={}", conversationId, targetUserId, adminUserId);
+        log.info("Members removed: conversationId={}, targetCount={}, removedBy={}",
+                conversationId, validIdsToRemove.size(), adminUserId);
+
+        // TODO: Publish System Message (e.g., "Admin Kien removed Binh from the group")
     }
 
     @Override
-    public void leaveGroup(ObjectId conversationId, Long userId) {
+    public void leaveGroup(ObjectId conversationId, Long userId, Long nextAdminId) {
         ConversationDocument conversation = getConversationAndValidateGroup(conversationId, userId);
 
-        // If user is the last admin, they must promote someone else first
-        // (simplified: if ADMIN and only 1 admin, block)
+        // check if the person wanting to leave is the Admin
         boolean isAdmin = conversation.getParticipants().stream()
                 .anyMatch(p -> p.getUserId().equals(userId) && p.getRole() == ParticipantRole.ADMIN);
 
         if (isAdmin) {
-            long adminCount = conversation.getParticipants().stream()
-                    .filter(p -> p.getRole() == ParticipantRole.ADMIN)
-                    .count();
-            if (adminCount <= 1 && conversation.getMemberCount() > 1) {
-                throw new AppException(ErrorCode.CONVERSATION_ADMIN_REQUIRED);
+            if(conversation.getMemberCount() > 1) {
+                if(nextAdminId == null) {
+                    throw new AppException(ErrorCode.MUST_TRANSFER_ADMIN_BEFORE_LEAVING);
+                }
+
+                boolean isNextAdminValid = conversation.getParticipants().stream()
+                        .anyMatch(p -> p.getUserId().equals(nextAdminId));
+
+                if (!isNextAdminValid || nextAdminId.equals(userId)) {
+                    throw new AppException(ErrorCode.PARTICIPANT_INVALID);
+                }
+
+                conversationRepository.promoteToAdmin(conversationId, nextAdminId);
+                log.info("Admin right transferred from {} to {} in group {}", userId, nextAdminId, conversationId);
+            } else {
+                dissolveGroup(conversationId, userId);
+                log.info("The last admin is leaving. Group {} will be empty.", conversationId);
             }
         }
 
-        long modified = conversationRepository.removeParticipant(conversationId, userId)
+        long modified = conversationRepository.removeParticipants(conversationId, List.of(userId))
                 .getModifiedCount();
 
         if (modified == 0) {
@@ -270,6 +293,36 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         log.info("User left group: conversationId={}, userId={}", conversationId, userId);
+
+        // (3. TODO: Fire System Message (E.g.: "Kien left the group", "Binh became Admin"))
+    }
+
+    @Override
+    public void updateGroupInfo(ObjectId conversationId, Long currentUserId, String newName, String newAvatarUrl) {
+        // (Fetch group info and ensure the user is in this group)
+        ConversationDocument conversation = getConversationAndValidateGroup(conversationId, currentUserId);
+        validateAdminCanEditInfoGroup(conversation, currentUserId);
+
+        String finalName = (newName != null && !newName.isBlank()) ? newName.trim() : null;
+        String finalAvatar = (newAvatarUrl != null && !newAvatarUrl.isBlank()) ? newAvatarUrl.trim() : null;
+
+        if (finalName == null && finalAvatar == null) {
+            log.info("Update group info ignored: No valid data provided for conversationId={}", conversationId);
+            return;
+        }
+
+        long modified = conversationRepository.updateGroupInfo(conversationId, finalName, finalAvatar)
+                .getModifiedCount();
+
+        if (modified == 0) {
+            throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        log.info("Group info updated: conversationId={}, updatedBy={}, newName={}, newAvatar={}",
+                conversationId, currentUserId, finalName, finalAvatar);
+
+        // 5. TODO: Bắn System Message
+        // (Example: If name -> "Kien changed the group name to X". If avatar -> "Kien changed the group photo")
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -291,7 +344,7 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     public void dissolveGroup(ObjectId conversationId, Long adminUserId) {
         ConversationDocument conversation = getConversationAndValidateGroup(conversationId, adminUserId);
-        validateAdmin(conversation, adminUserId);
+        validateAdminCanDissolveGroup(conversation, adminUserId);
 
         long modified = conversationRepository.softDelete(conversationId)
                 .getModifiedCount();
@@ -301,10 +354,6 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         log.info("Group dissolved: conversationId={}, by adminUserId={}", conversationId, adminUserId);
-
-        // TODO: Schedule background job to hard-delete after 30 days
-        // scheduler.schedule(() -> conversationRepository.deleteById(conversationId),
-        //     Instant.now().plus(30, ChronoUnit.DAYS));
     }
 
     @Override
@@ -341,6 +390,26 @@ public class ConversationServiceImpl implements ConversationService {
     @Override
     public void markAsRead(ObjectId conversationId, Long userId) {
         conversationRepository.resetUnreadCount(conversationId, userId);
+    }
+
+    @Override
+    public void changeNickName(ObjectId conversationId, Long userId, String nickname) {
+        ConversationDocument conversation = getConversationById(conversationId, userId);
+
+        String fallbackFullName = conversation.getParticipants().stream()
+                .filter(p -> p.getUserId().equals(userId))
+                .map(Participant::getFullName)
+                .findFirst()
+                .orElseThrow(() -> new AppException(ErrorCode.PARTICIPANT_NOT_FOUND));
+
+        // (Routing logic: Set new or Remove?)
+        boolean isRemoving = (nickname == null || nickname.trim().isEmpty());
+        String finalNickname = isRemoving ? null : nickname.trim();
+
+        conversationRepository.updateNickname(conversationId, userId, finalNickname, fallbackFullName);
+
+        log.info("Nickname updated: conversationId={}, targetUserId={}, newNickname={}",
+                conversationId, userId, finalNickname);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -422,6 +491,37 @@ public class ConversationServiceImpl implements ConversationService {
                 // TODO: create require to join group
                 throw new AppException(ErrorCode.CONVERSATION_ADMIN_REQUIRED);
             }
+        }
+    }
+
+    private void validateAdminCanDeleteMembers(ConversationDocument conversation, Long userId) {
+        boolean isAdmin = conversation.getParticipants().stream()
+                .anyMatch(p -> p.getUserId().equals(userId) && p.getRole() == ParticipantRole.ADMIN);
+
+        if (!isAdmin) {
+            throw new AppException(ErrorCode.ONLY_ADMIN_CAN_DELETE_MEMBER);
+        }
+    }
+
+    private void validateAdminCanEditInfoGroup(ConversationDocument conversation, Long userId) {
+        boolean isOnlyAdminEdit = conversation.getSettings().isOnlyAdminsCanEditInfo();
+
+        if (isOnlyAdminEdit) {
+            boolean isAdmin = conversation.getParticipants().stream()
+                    .anyMatch(p -> p.getUserId().equals(userId) && p.getRole() == ParticipantRole.ADMIN);
+
+            if (!isAdmin) {
+                throw new AppException(ErrorCode.ONLY_ADMIN_CAN_EDIT_INFO);
+            }
+        }
+    }
+
+    private void validateAdminCanDissolveGroup(ConversationDocument conversation, Long userId) {
+        boolean isAdmin = conversation.getParticipants().stream()
+                .anyMatch(p -> p.getUserId().equals(userId) && p.getRole() == ParticipantRole.ADMIN);
+
+        if (!isAdmin) {
+            throw new AppException(ErrorCode.ONLY_ADMIN_CAN_DISSOLVE_GROUP);
         }
     }
 

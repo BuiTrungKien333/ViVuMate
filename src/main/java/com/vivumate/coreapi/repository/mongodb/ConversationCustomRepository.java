@@ -1,5 +1,6 @@
 package com.vivumate.coreapi.repository.mongodb;
 
+import com.mongodb.bulk.BulkWriteResult;
 import com.vivumate.coreapi.document.ConversationDocument;
 import com.vivumate.coreapi.document.subdoc.LastMessagePreview;
 import com.vivumate.coreapi.document.subdoc.Participant;
@@ -101,10 +102,12 @@ public interface ConversationCustomRepository {
                                          List<Long> newParticipantIds, int maxMembers);
 
     /**
-     * Remove a participant from a GROUP conversation.
+     * Remove multi participant from a GROUP conversation.
      * Atomically pulls from both arrays and decrements {@code member_count}.
      */
-    UpdateResult removeParticipant(ObjectId conversationId, Long userId);
+    UpdateResult removeParticipants(ObjectId conversationId, List<Long> targetUserIds);
+
+    void promoteToAdmin(ObjectId conversationId, Long newAdminId);
 
     // ═══════════════════════════════════════════════════════════
     //  PARTICIPANT SETTINGS
@@ -148,4 +151,8 @@ public interface ConversationCustomRepository {
      * Does NOT delete any data — just sets a watermark.
      */
     UpdateResult updateClearedAt(ObjectId conversationId, Long userId, Instant clearedAt);
+
+    void updateNickname(ObjectId conversationId, Long userId, String newNickname, String fallbackFullName);
+
+    UpdateResult updateGroupInfo(ObjectId conversationId, String newName, String newAvatarUrl);
 }

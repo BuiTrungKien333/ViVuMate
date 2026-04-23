@@ -57,6 +57,10 @@ public class MessageServiceImpl implements MessageService {
                 .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_ACCESS_DENIED));
 
         // 2. Build sender snapshot from PostgreSQL
+        /*
+        Nếu như tin nhắn này thuộc GROUP thì SenderSnapshot mới cần đủ thông tin (userId, username, full_name, avatar_url)
+        Còn nếu là tin nhắn DIRECT thì lấy trực tiếp tại conversation đó luôn (lấy userId để biết ai gửi là được rồi)
+         */
         SenderSnapshot sender = buildSenderSnapshot(senderUserId);
 
         // 3. Persist the message

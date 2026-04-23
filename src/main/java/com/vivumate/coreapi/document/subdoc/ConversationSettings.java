@@ -19,7 +19,7 @@ public class ConversationSettings {
 
     /** If true, only admins can edit group name/avatar/description. */
     @Builder.Default
-    private boolean onlyAdminsCanEditInfo = true;
+    private boolean onlyAdminsCanEditInfo = false;
 
     /** If true, new members need admin approval to join. */
     @Builder.Default

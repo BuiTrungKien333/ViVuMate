@@ -52,6 +52,13 @@ public enum ErrorCode {
     CONVERSATION_ADMIN_REQUIRED(4007, "error.chat.conversation.admin_required", HttpStatus.FORBIDDEN),
     PARTICIPANT_ALREADY_EXISTS(4008, "error.chat.participant.already_exists", HttpStatus.CONFLICT),
     PARTICIPANT_NOT_FOUND(4009, "error.chat.participant.notfound", HttpStatus.NOT_FOUND),
+    ONLY_ADMIN_CAN_DELETE_MEMBER(4010, "error.chat.conversation.only_admin_can_delete_member", HttpStatus.FORBIDDEN), // chỉ admin mới có quyển xóa members
+    MUST_TRANSFER_ADMIN_BEFORE_LEAVING(4011, "error.chat.conversation.must_transfer_admin_before_leaving", HttpStatus.FORBIDDEN), // Bạn là Admin. Vui lòng chỉ định Admin mới trước khi rời nhóm.
+    PARTICIPANT_INVALID(4012, "error.chat.conversation.participant_invalid", HttpStatus.FORBIDDEN), // Người được chỉ định làm Admin mới không hợp lệ.
+    ONLY_ADMIN_CAN_DISSOLVE_GROUP(4013, "error.chat.conversation.only_admin_can_dissolve_group", HttpStatus.FORBIDDEN),
+    NICKNAME_NOT_BLANK(4014, "error.chat.conversation.nickname_not_blank", HttpStatus.LENGTH_REQUIRED), // nickname không được bỏ trống
+    ONLY_ADMIN_CAN_EDIT_INFO(4015, "error.chat.conversation.only_admin_can_edit_info", HttpStatus.FORBIDDEN), // chỉ có admin mới có thể chỉnh sửa thông tin nhóm
+
 
     MESSAGE_NOT_FOUND(4101, "error.chat.message.notfound", HttpStatus.NOT_FOUND),
     MESSAGE_EDIT_DENIED(4102, "error.chat.message.edit_denied", HttpStatus.FORBIDDEN),

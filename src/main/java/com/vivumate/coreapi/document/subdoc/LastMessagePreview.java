@@ -24,6 +24,7 @@ public class LastMessagePreview {
     /** PostgreSQL user ID of the sender. */
     private Long senderId;
 
+    /* use nickname, if nickname null then use fullName*/
     private String senderName;
 
     /** Truncated to 100 characters max. */

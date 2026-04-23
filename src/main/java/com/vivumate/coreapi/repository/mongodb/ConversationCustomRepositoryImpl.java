@@ -1,6 +1,7 @@
 package com.vivumate.coreapi.repository.mongodb;
 
 import com.vivumate.coreapi.document.ConversationDocument;
+import com.vivumate.coreapi.document.enums.ParticipantRole;
 import com.vivumate.coreapi.document.subdoc.LastMessagePreview;
 import com.vivumate.coreapi.document.subdoc.Participant;
 import com.mongodb.client.result.UpdateResult;
@@ -236,17 +237,40 @@ public class ConversationCustomRepositoryImpl implements ConversationCustomRepos
     }
 
     @Override
-    public UpdateResult removeParticipant(ObjectId conversationId, Long userId) {
+    public UpdateResult removeParticipants(ObjectId conversationId, List<Long> targetUserIds) {
         Query query = new Query(Criteria.where("_id").is(conversationId));
 
-        Update update = new Update()
-                .pull("participants", new org.bson.Document("userId", userId))
-                .pull("participantIds", userId)
-                .inc("memberCount", -1)
-                .unset("unreadCounts." + userId)
-                .set("updatedAt", Instant.now());
+        Update update = new Update();
+        // use $in to pull multi objects from the participants array
+        update.pull("participants", new org.bson.Document("user_id", new org.bson.Document("$in", targetUserIds)));
+
+        // use pullAll to remove from primitive ID array
+        update.pullAll("participantIds", targetUserIds.toArray());
+
+        // update the member count
+        update.inc("memberCount", targetUserIds.size() * -1);
+
+        // (Clean up unreadCounts using a loop)
+        for (Long userId : targetUserIds) {
+            update.unset("unreadCounts." + userId);
+            update.unset("unreadMentions." + userId);
+        }
+
+        update.set("updatedAt", Instant.now());
 
         return mongoTemplate.updateFirst(query, update, ConversationDocument.class);
+    }
+
+    @Override
+    public void promoteToAdmin(ObjectId conversationId, Long newAdminId) {
+        Query query = new Query(Criteria.where("_id").is(conversationId)
+                .and("participants.userId").is(newAdminId));
+
+        Update update = new Update()
+                .set("participants.$.role", ParticipantRole.ADMIN)
+                .set("updatedAt", Instant.now());
+
+        mongoTemplate.updateFirst(query, update, ConversationDocument.class);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -280,19 +304,38 @@ public class ConversationCustomRepositoryImpl implements ConversationCustomRepos
 
     @Override
     public long updateParticipantSnapshot(Long userId, String fullName, String avatarUrl) {
+        long totalModified = 0;
         // Find all conversations where this user is a participant
-        Query query = new Query(Criteria.where("participants.userId").is(userId));
+        // (UPDATE 1: Update info inside the 'participants' array)
+        Query query1 = new Query(Criteria.where("participants.userId").is(userId));
 
         // Use positional operator to update the matched participant's snapshot
-        Update update = new Update()
+        Update update1 = new Update()
                 .set("participants.$.fullName", fullName)
-                .set("lastMessage.$.senderName", fullName)
                 .set("participants.$.avatarUrl", avatarUrl)
                 .set("updatedAt", Instant.now());
 
         // updateMulti: update ALL matching conversations, not just the first
-        UpdateResult result = mongoTemplate.updateMulti(query, update, ConversationDocument.class);
-        return result.getModifiedCount();
+        UpdateResult result1 = mongoTemplate.updateMulti(query1, update1, ConversationDocument.class);
+        totalModified += result1.getModifiedCount();
+
+        // (UPDATE 2: Update 'lastMessage' (ONLY WHEN 2 CONDITIONS ARE MET))
+        // (Condition 1: The user updating is indeed the sender of the last message.)
+        // (Condition 2: This user DOES NOT have a nickname set in this conversation.)
+        Query query2 = new Query(Criteria.where("lastMessage.senderId").is(userId))
+                .addCriteria(Criteria.where("participants").elemMatch(
+                        Criteria.where("userId").is(userId).and("nickname").isNull()
+                ));
+
+        Update update2 = new Update()
+                .set("lastMessage.senderName", fullName)
+                .set("updatedAt", Instant.now());
+
+
+        UpdateResult result2 = mongoTemplate.updateMulti(query2, update2, ConversationDocument.class);
+        totalModified += result2.getModifiedCount();
+
+        return totalModified;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -327,4 +370,49 @@ public class ConversationCustomRepositoryImpl implements ConversationCustomRepos
 
         return mongoTemplate.updateFirst(query, update, ConversationDocument.class);
     }
+
+    @Override
+    public void updateNickname(ObjectId conversationId, Long userId, String newNickname, String fallbackFullName) {
+        Query query1 = new Query(Criteria.where("_id").is(conversationId)
+                .and("participants.userId").is(userId));
+
+        Update update1 = new Update().set("updatedAt", Instant.now());
+
+        if (newNickname != null) {
+            update1.set("participants.$.nickname", newNickname);
+        } else {
+            // (If removing nickname, use $unset to cleanly sweep this field from DB)
+            update1.unset("participants.$.nickname");
+        }
+
+        mongoTemplate.updateFirst(query1, update1, ConversationDocument.class);
+
+        Query query2 = new Query(Criteria.where("_id").is(conversationId)
+                .and("last_message.senderId").is(userId));
+
+        Update update2 = new Update().set("updatedAt", Instant.now());
+
+        // (If removing nickname, return the real name (fallbackFullName) to the last message)
+        update2.set("last_message.senderName", newNickname != null ? newNickname : fallbackFullName);
+
+        mongoTemplate.updateFirst(query2, update2, ConversationDocument.class);
+    }
+
+    @Override
+    public UpdateResult updateGroupInfo(ObjectId conversationId, String newName, String newAvatarUrl) {
+        Query query = new Query(Criteria.where("_id").is(conversationId));
+
+        Update update = new Update().set("updatedAt", Instant.now());
+
+        if (newName != null) {
+            update.set("name", newName);
+        }
+
+        if (newAvatarUrl != null) {
+            update.set("avatarUrl", newAvatarUrl);
+        }
+
+        return mongoTemplate.updateFirst(query, update, ConversationDocument.class);
+    }
+
 }

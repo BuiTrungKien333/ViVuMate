@@ -1,5 +1,6 @@
 package com.vivumate.coreapi.repository.mongodb;
 
+import com.mongodb.bulk.BulkWriteResult;
 import com.vivumate.coreapi.document.ConversationDocument;
 import com.vivumate.coreapi.document.enums.ConversationType;
 import org.bson.types.ObjectId;
@@ -8,6 +9,7 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -72,4 +74,9 @@ public interface ConversationRepository
 
     @Query(value = "{ 'participant_ids': ?0, 'type': 'GROUP', 'deleted_at': null }", fields = "{ '_id': 1 }")
     List<ConversationDocument> findGroupIdsByUserId(Long userId);
+
+    @Query(value = "{ 'deleted_at': { $lte: ?0 } }", fields = "{ '_id': 1 }")
+    List<ConversationDocument> findExpiredConversations(Instant cutoffDate);
+
+    void deleteAllByIdIn(List<ObjectId> conversationIds);
 }

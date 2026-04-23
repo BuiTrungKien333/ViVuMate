@@ -7,6 +7,10 @@ server:
       force: true
 
 spring:
+  threads:
+    virtual:
+      enabled: true
+
   output:
     ansi:
       enabled: always
@@ -88,3 +92,10 @@ management:
       show-details: always
       probes:
         enabled: true
+
+application:
+  security:
+    cors:
+      allowed-origins:
+        - "http://localhost:3000"
+        - "https://vivumate.com"
