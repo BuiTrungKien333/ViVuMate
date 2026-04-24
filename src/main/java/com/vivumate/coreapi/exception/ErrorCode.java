@@ -63,7 +63,12 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND(4101, "error.chat.message.notfound", HttpStatus.NOT_FOUND),
     MESSAGE_EDIT_DENIED(4102, "error.chat.message.edit_denied", HttpStatus.FORBIDDEN),
     MESSAGE_RECALL_DENIED(4103, "error.chat.message.recall_denied", HttpStatus.FORBIDDEN),
-    CANNOT_DM_SELF(4104, "error.chat.dm.self", HttpStatus.BAD_REQUEST);
+    CANNOT_DM_SELF(4104, "error.chat.dm.self", HttpStatus.BAD_REQUEST),
+
+    // 5xxx: WebSocket
+    UNAUTHENTICATED(5001, "error.ws.unauthenticated", HttpStatus.UNAUTHORIZED),
+    WS_CONNECTION_LIMIT(5002, "error.ws.connection_limit", HttpStatus.TOO_MANY_REQUESTS),
+    WS_RATE_LIMITED(5003, "error.ws.rate_limited", HttpStatus.TOO_MANY_REQUESTS);
 
     private final int code;
     private final String messageKey;

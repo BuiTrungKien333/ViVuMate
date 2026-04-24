@@ -33,7 +33,8 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     private static final String[] WHITE_LIST = {"/api/v1/auth/**", "/api/v1/public/**", "/actuator/**",
-            "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error"};
+            "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error",
+            "/ws-connect/**"}; // WebSocket — auth handled by STOMP-level WebSocketAuthInterceptor
 
     @Value("${application.security.cors.allowed-origins}")
     private List<String> allowedOrigins;

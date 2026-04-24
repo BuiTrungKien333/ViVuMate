@@ -78,6 +78,14 @@ vivumate:
   app:
     frontend-url: ${FRONTEND_URL:http://localhost:3000}
 
+  server:
+    id: ${SERVER_ID:local-dev}
+
+  websocket:
+    rate-limit:
+      max-sends-per-window: 120  # Max SEND frames per user per window
+      window-seconds: 60         # Rate limit window duration
+
   openapi:
     dev-url: http://localhost:8080
 
