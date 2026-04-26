@@ -1,9 +1,11 @@
 package com.vivumate.coreapi.websocket.interceptor;
 
+import com.vivumate.coreapi.exception.AppException;
+import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.websocket.security.StompPrincipal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -32,11 +34,13 @@ import java.time.Duration;
  * A malicious or buggy client could flood the server with SEND frames.
  * <p>
  * <b>Behavior on limit exceeded:</b>
- * The message is silently dropped (returns {@code null} from {@link #preSend}).
- * A warning log is emitted. The client receives no explicit error —
- * this is intentional to avoid amplifying a flood attack with error frames.
- * For production, consider sending a STOMP ERROR frame or an in-band
- * rate-limit notification.
+ * Throws {@link AppException} with {@link ErrorCode#WS_RATE_LIMITED}.
+ * The global STOMP error handler converts this into a STOMP ERROR frame
+ * sent to the client's error queue.
+ * <p>
+ * <b>Telemetry:</b> Structured log events with prefix {@code RATE_LIMIT:}
+ * are emitted for rate-limited actions, enabling monitoring via log
+ * aggregation (ELK/Loki) until Micrometer is integrated (Phase 7).
  */
 @Component
 @Slf4j(topic = "WEBSOCKET_RATE_LIMIT_INTERCEPTOR")
@@ -44,7 +48,7 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
 
     private static final String RATE_LIMIT_KEY_PREFIX = "ws_rate:";
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * Maximum number of SEND frames allowed per user within the time window.
@@ -57,7 +61,7 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
     private final Duration windowDuration;
 
     public WebSocketRateLimitInterceptor(
-            RedisTemplate<String, Object> redisTemplate,
+            StringRedisTemplate redisTemplate,
             @Value("${vivumate.websocket.rate-limit.max-sends-per-window:120}") int maxSendsPerWindow,
             @Value("${vivumate.websocket.rate-limit.window-seconds:60}") int windowSeconds) {
         this.redisTemplate = redisTemplate;
@@ -71,7 +75,8 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
      *
      * @param message the inbound STOMP message
      * @param channel the message channel
-     * @return the original message if within limits, or {@code null} to drop it
+     * @return the original message if within limits, or throws if exceeded
+     * @throws AppException with {@code WS_RATE_LIMITED} when limit is exceeded
      */
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
@@ -85,7 +90,7 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
         StompPrincipal principal = (StompPrincipal) accessor.getUser();
         if (principal == null) {
             // Unauthenticated SEND — should not happen if auth interceptor is configured correctly
-            log.warn("(Rejected) SEND from unauthenticated session. sessionId={}", accessor.getSessionId());
+            log.warn("RATE_LIMIT: Rejected unauthenticated SEND. sessionId={}", accessor.getSessionId());
             return null;
         }
 
@@ -96,7 +101,7 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
         Long currentCount = redisTemplate.opsForValue().increment(rateLimitKey);
         if (currentCount == null) {
             // Redis unavailable — fail open (allow the message)
-            log.warn("Redis INCR returned null for rate limit. userId={}, allowing message.", userId);
+            log.warn("RATE_LIMIT: Redis INCR returned null, failing open. userId={}", userId);
             return message;
         }
 
@@ -106,9 +111,10 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
         }
 
         if (currentCount > maxSendsPerWindow) {
-            log.warn("(RateLimited) User exceeded WebSocket SEND limit. userId={}, count={}, limit={}/{}s",
-                    userId, currentCount, maxSendsPerWindow, windowDuration.getSeconds());
-            return null; // Drop the message silently
+            String destination = accessor.getDestination();
+            log.warn("RATE_LIMIT: Exceeded. userId={}, count={}, limit={}/{}, destination={}",
+                    userId, currentCount, maxSendsPerWindow, windowDuration.getSeconds() + "s", destination);
+            throw new AppException(ErrorCode.WS_RATE_LIMITED);
         }
 
         return message;

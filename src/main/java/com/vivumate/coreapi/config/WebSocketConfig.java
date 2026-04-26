@@ -2,7 +2,6 @@ package com.vivumate.coreapi.config;
 
 import com.vivumate.coreapi.websocket.interceptor.WebSocketAuthInterceptor;
 import com.vivumate.coreapi.websocket.interceptor.WebSocketRateLimitInterceptor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -23,6 +22,10 @@ import java.util.concurrent.Executors;
 /**
  * WebSocket STOMP configuration for the real-time messaging system.
  * <p>
+ * <b>All parameters are externalized</b> to {@code application.yml} under
+ * the {@code vivumate.websocket.*} namespace. Profile-specific overrides
+ * (dev/docker/prod) tune values per environment without code changes.
+ * <p>
  * <b>Architecture decisions:</b>
  * <ul>
  *   <li><b>Protocol:</b> STOMP over WebSocket — provides a structured messaging
@@ -33,9 +36,8 @@ import java.util.concurrent.Executors;
  *       in {@code CrossServerMessageRouter} (Phase 6), NOT by an external STOMP broker.
  *       This avoids the operational complexity of RabbitMQ/ActiveMQ while achieving
  *       the same result.</li>
- *   <li><b>SockJS Fallback:</b> Enabled for browsers that don't support WebSocket
- *       natively (rare in modern browsers, but important for corporate proxies
- *       and firewalls that may block WebSocket upgrade requests).</li>
+ *   <li><b>SockJS Fallback:</b> Configurable per environment. Enabled in dev for
+ *       browser testing, disabled in prod where mobile apps use native WebSocket.</li>
  *   <li><b>Authentication:</b> JWT-based via {@link WebSocketAuthInterceptor} on
  *       the STOMP CONNECT frame — consistent with the REST API's stateless auth.</li>
  * </ul>
@@ -68,15 +70,71 @@ import java.util.concurrent.Executors;
  */
 @Configuration
 @EnableWebSocketMessageBroker
-@RequiredArgsConstructor
 @Slf4j(topic = "WEBSOCKET_CONFIG")
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor authInterceptor;
     private final WebSocketRateLimitInterceptor rateLimitInterceptor;
 
-    @Value("${application.security.cors.allowed-origins}")
-    private List<String> allowedOrigins;
+    // --- Endpoint & Broker ---
+    private final String endpoint;
+    private final String appDestinationPrefix;
+    private final String userDestinationPrefix;
+    private final List<String> brokerDestinations;
+
+    // --- Heartbeat ---
+    private final long heartbeatServer;
+    private final long heartbeatClient;
+
+    // --- Transport ---
+    private final int messageSizeLimit;
+    private final int sendBufferSizeLimit;
+    private final int sendTimeLimit;
+
+    // --- SockJS ---
+    private final boolean sockjsEnabled;
+    private final int sockjsStreamBytesLimit;
+    private final int sockjsHttpMessageCacheSize;
+    private final long sockjsDisconnectDelay;
+
+    // --- CORS ---
+    private final List<String> allowedOrigins;
+
+    public WebSocketConfig(
+            WebSocketAuthInterceptor authInterceptor,
+            WebSocketRateLimitInterceptor rateLimitInterceptor,
+            @Value("${vivumate.websocket.endpoint:/ws-connect}") String endpoint,
+            @Value("${vivumate.websocket.app-destination-prefix:/app}") String appDestinationPrefix,
+            @Value("${vivumate.websocket.user-destination-prefix:/user}") String userDestinationPrefix,
+            @Value("${vivumate.websocket.broker-destinations}") List<String> brokerDestinations,
+            @Value("${vivumate.websocket.heartbeat.server:25000}") long heartbeatServer,
+            @Value("${vivumate.websocket.heartbeat.client:25000}") long heartbeatClient,
+            @Value("${vivumate.websocket.transport.message-size-limit:65536}") int messageSizeLimit,
+            @Value("${vivumate.websocket.transport.send-buffer-size-limit:524288}") int sendBufferSizeLimit,
+            @Value("${vivumate.websocket.transport.send-time-limit:20000}") int sendTimeLimit,
+            @Value("${vivumate.websocket.sockjs.enabled:true}") boolean sockjsEnabled,
+            @Value("${vivumate.websocket.sockjs.stream-bytes-limit:524288}") int sockjsStreamBytesLimit,
+            @Value("${vivumate.websocket.sockjs.http-message-cache-size:1000}") int sockjsHttpMessageCacheSize,
+            @Value("${vivumate.websocket.sockjs.disconnect-delay:30000}") long sockjsDisconnectDelay,
+            @Value("${application.security.cors.allowed-origins}") List<String> allowedOrigins) {
+
+        this.authInterceptor = authInterceptor;
+        this.rateLimitInterceptor = rateLimitInterceptor;
+        this.endpoint = endpoint;
+        this.appDestinationPrefix = appDestinationPrefix;
+        this.userDestinationPrefix = userDestinationPrefix;
+        this.brokerDestinations = brokerDestinations;
+        this.heartbeatServer = heartbeatServer;
+        this.heartbeatClient = heartbeatClient;
+        this.messageSizeLimit = messageSizeLimit;
+        this.sendBufferSizeLimit = sendBufferSizeLimit;
+        this.sendTimeLimit = sendTimeLimit;
+        this.sockjsEnabled = sockjsEnabled;
+        this.sockjsStreamBytesLimit = sockjsStreamBytesLimit;
+        this.sockjsHttpMessageCacheSize = sockjsHttpMessageCacheSize;
+        this.sockjsDisconnectDelay = sockjsDisconnectDelay;
+        this.allowedOrigins = allowedOrigins;
+    }
 
     // ═══════════════════════════════════════════════════════════
     // VIRTUAL THREAD EXECUTOR — Java 21
@@ -115,16 +173,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * Configures the message broker.
+     * Configures the message broker with externalized heartbeat and prefix values.
      * <p>
-     * <b>Simple broker</b> handles subscriptions to:
-     * <ul>
-     *   <li>{@code /topic/*} — broadcast destinations (conversation messages, presence events)</li>
-     *   <li>{@code /queue/*} — point-to-point destinations (user-specific queues)</li>
-     * </ul>
+     * <b>Simple broker</b> handles subscriptions to configured destinations.
      * <p>
-     * <b>Heartbeat:</b> Server sends heartbeat every 25s, expects client heartbeat
-     * every 25s. If no heartbeat received within the timeout, the connection is
+     * <b>Heartbeat:</b> Configured via {@code vivumate.websocket.heartbeat.*}.
+     * Default: server sends every 25s, expects client pong every 25s.
+     * If no heartbeat received within the timeout, the connection is
      * considered dead and will be closed. The 25-second interval is chosen to:
      * <ul>
      *   <li>Keep the connection alive through NAT timeouts (typically 30-60s)</li>
@@ -132,24 +187,25 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      *   <li>Minimize bandwidth overhead on mobile networks</li>
      * </ul>
      * <p>
-     * <b>User destination prefix:</b> {@code /user} — Spring automatically routes
-     * messages sent via {@code convertAndSendToUser(userId, dest, payload)} to the
-     * correct user's session(s). The userId comes from {@code StompPrincipal.getName()}.
+     * <b>User destination prefix:</b> Spring automatically routes messages sent via
+     * {@code convertAndSendToUser(userId, dest, payload)} to the correct user's
+     * session(s). The userId comes from {@code StompPrincipal.getName()}.
      */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/queue")
-                .setHeartbeatValue(new long[]{25000, 25000})  // server-to-client (ping), client-to-server (pong)
+        String[] destinations = brokerDestinations.toArray(String[]::new);
+
+        registry.enableSimpleBroker(destinations)
+                .setHeartbeatValue(new long[]{heartbeatServer, heartbeatClient})
                 .setTaskScheduler(createHeartbeatScheduler());
 
-        // Prefix for @MessageMapping destinations
-        // Client sends to: /app/chat.send → handled by @MessageMapping("/chat.send")
-        registry.setApplicationDestinationPrefixes("/app");
+        registry.setApplicationDestinationPrefixes(appDestinationPrefix);
+        registry.setUserDestinationPrefix(userDestinationPrefix);
 
-        // Prefix for user-specific destinations
-        // Server sends: convertAndSendToUser("1001", "/queue/messages", msg)
-        // Client subscribes: /user/queue/messages
-        registry.setUserDestinationPrefix("/user");
+        log.info("Message broker configured: destinations={}, heartbeat=[server={}ms, client={}ms], " +
+                        "appPrefix={}, userPrefix={}",
+                brokerDestinations, heartbeatServer, heartbeatClient,
+                appDestinationPrefix, userDestinationPrefix);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -157,35 +213,46 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * Registers the STOMP WebSocket endpoint.
+     * Registers the STOMP WebSocket endpoint with optional SockJS fallback.
      * <p>
-     * <b>Endpoint:</b> {@code /ws-connect}
+     * <b>Endpoint:</b> Configurable via {@code vivumate.websocket.endpoint}
+     * (default: {@code /ws-connect}).
      * <ul>
      *   <li>WebSocket URL: {@code ws://host:port/ws-connect}</li>
-     *   <li>SockJS URL: {@code http://host:port/ws-connect} (HTTP transport fallback)</li>
+     *   <li>SockJS URL (if enabled): {@code http://host:port/ws-connect}</li>
      * </ul>
      * <p>
+     * <b>SockJS:</b> Controlled by {@code vivumate.websocket.sockjs.enabled}.
+     * Enabled in dev for browser testing, disabled in prod where mobile apps
+     * use native WebSocket. Disabling in prod removes unnecessary HTTP
+     * fallback endpoints and reduces attack surface.
+     * <p>
      * <b>CORS:</b> Uses the same allowed origins as the REST API
-     * (configured in {@code application.yml}).
+     * (configured in {@code application.security.cors.allowed-origins}).
+     * Production profile restricts to production domains only.
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         String[] origins = allowedOrigins.toArray(String[]::new);
 
         // Primary: native WebSocket (mobile apps, modern browsers)
-        registry.addEndpoint("/ws-connect")
+        registry.addEndpoint(endpoint)
                 .setAllowedOrigins(origins);
 
-        // Fallback: SockJS for environments where WebSocket is blocked
-        registry.addEndpoint("/ws-connect")
-                .setAllowedOrigins(origins)
-                .withSockJS()
-                .setStreamBytesLimit(512 * 1024)         // 512KB per streaming response
-                .setHttpMessageCacheSize(1000)            // Cache up to 1000 messages during transport switch
-                .setDisconnectDelay(30 * 1000L);          // 30s before closing idle SockJS session
+        // Optional fallback: SockJS for environments where WebSocket is blocked
+        if (sockjsEnabled) {
+            registry.addEndpoint(endpoint)
+                    .setAllowedOrigins(origins)
+                    .withSockJS()
+                    .setStreamBytesLimit(sockjsStreamBytesLimit)
+                    .setHttpMessageCacheSize(sockjsHttpMessageCacheSize)
+                    .setDisconnectDelay(sockjsDisconnectDelay);
 
-        log.info("STOMP endpoints registered: /ws-connect (WebSocket + SockJS), allowedOrigins={}",
-                allowedOrigins);
+            log.info("STOMP endpoints registered: {} (WebSocket + SockJS), allowedOrigins={}", endpoint, allowedOrigins);
+        } else {
+            log.info("STOMP endpoints registered: {} (WebSocket only, SockJS disabled), allowedOrigins={}",
+                    endpoint, allowedOrigins);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -242,26 +309,29 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * Configures WebSocket transport limits.
+     * Configures WebSocket transport limits from externalized properties.
      * <p>
-     * <b>Message size limit:</b> 64KB — sufficient for text messages (max ~4KB)
-     * with overhead. Media is uploaded separately via REST API; only the URL
-     * is sent via WebSocket.
+     * <b>Message size limit</b> ({@code vivumate.websocket.transport.message-size-limit}):
+     * 64KB default — sufficient for text messages (max ~4KB) with overhead.
+     * Media is uploaded separately via REST API; only the URL is sent via WebSocket.
      * <p>
-     * <b>Send buffer size limit:</b> 512KB — max bytes buffered per session
-     * when the client is slow to read. Prevents memory exhaustion from
-     * slow consumers.
+     * <b>Send buffer size limit</b> ({@code vivumate.websocket.transport.send-buffer-size-limit}):
+     * 512KB default — max bytes buffered per session when the client is slow to read.
+     * Prevents memory exhaustion from slow consumers.
      * <p>
-     * <b>Send time limit:</b> 20 seconds — max time to wait for a slow client
-     * to accept a message. After this, the message is dropped and the
-     * session may be closed.
+     * <b>Send time limit</b> ({@code vivumate.websocket.transport.send-time-limit}):
+     * 20 seconds default — max time to wait for a slow client to accept a message.
+     * After this, the message is dropped and the session may be closed.
      */
     @Override
     public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
         registration
-                .setMessageSizeLimit(64 * 1024)          // 64 KB max message size
-                .setSendBufferSizeLimit(512 * 1024)       // 512 KB send buffer per session
-                .setSendTimeLimit(20 * 1000);             // 20 seconds send timeout
+                .setMessageSizeLimit(messageSizeLimit)
+                .setSendBufferSizeLimit(sendBufferSizeLimit)
+                .setSendTimeLimit(sendTimeLimit);
+
+        log.info("Transport limits: messageSizeLimit={}KB, sendBufferSizeLimit={}KB, sendTimeLimit={}ms",
+                messageSizeLimit / 1024, sendBufferSizeLimit / 1024, sendTimeLimit);
     }
 
     // ═══════════════════════════════════════════════════════════

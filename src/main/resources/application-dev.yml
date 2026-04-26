@@ -24,6 +24,19 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:123456}
 
+####################
+# Dev-specific WebSocket overrides
+vivumate:
+  websocket:
+    session:
+      max-per-user: 10                       # Relaxed for dev/testing (default: 5)
+    rate-limit:
+      max-sends-per-window: 300              # Relaxed for dev/testing (default: 120)
+
 logging:
   level:
     org.springframework.security: DEBUG
+    WEBSOCKET_SESSION_MANAGER: DEBUG
+    WEBSOCKET_EVENT_LISTENER: DEBUG
+    WEBSOCKET_AUTH_INTERCEPTOR: DEBUG
+    WEBSOCKET_RATE_LIMIT_INTERCEPTOR: DEBUG

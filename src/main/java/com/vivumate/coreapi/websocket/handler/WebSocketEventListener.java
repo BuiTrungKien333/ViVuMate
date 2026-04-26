@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -14,7 +15,7 @@ import java.util.Map;
 
 /**
  * Listens for WebSocket lifecycle events (connect/disconnect) and
- * coordinates session registration and cleanup.
+ * coordinates session registration, cleanup, and routing TTL renewal.
  * <p>
  * <b>Events handled:</b>
  * <ul>
@@ -31,6 +32,23 @@ import java.util.Map;
  * BEFORE authentication. {@code SessionConnectedEvent} fires AFTER the
  * CONNECTED reply is sent, guaranteeing that authentication succeeded.
  * <p>
+ * <b>TTL renewal strategy:</b>
+ * A scheduled task runs periodically to renew the Redis TTL on all
+ * {@code ws_routing:{userId}} keys for locally connected users. This ensures:
+ * <ul>
+ *   <li>Keys stay alive as long as the server is healthy and users are connected</li>
+ *   <li>Keys auto-expire (within {@code routing.ttl-seconds}) if the server crashes</li>
+ *   <li>No per-heartbeat Redis calls — one batch renewal covers all users</li>
+ * </ul>
+ * <p>
+ * <b>Telemetry:</b> Structured log events with standardized prefixes enable
+ * monitoring via log aggregation until Micrometer is integrated (Phase 7):
+ * <ul>
+ *   <li>{@code SESSION_CONNECT:} — successful WebSocket session established</li>
+ *   <li>{@code SESSION_DISCONNECT:} — WebSocket session closed</li>
+ *   <li>{@code SESSION_HEARTBEAT:} — periodic routing TTL renewal</li>
+ * </ul>
+ * <p>
  * <b>Presence integration (Phase 4):</b>
  * This listener will be extended to update Redis presence keys and publish
  * online/offline events when the Presence system is implemented.
@@ -44,6 +62,10 @@ import java.util.Map;
 public class WebSocketEventListener {
 
     private final WebSocketSessionManager sessionManager;
+
+    // ═══════════════════════════════════════════════════════════
+    // LIFECYCLE EVENTS
+    // ═══════════════════════════════════════════════════════════
 
     /**
      * Handles successful WebSocket connection.
@@ -62,18 +84,18 @@ public class WebSocketEventListener {
         // Extract userId from the principal set during CONNECT authentication
         StompPrincipal principal = extractPrincipal(accessor);
         if (principal == null) {
-            log.warn("(Skipped) SessionConnected without principal. sessionId={}", sessionId);
+            log.warn("SESSION_CONNECT: No principal. sessionId={}", sessionId);
             return;
         }
 
         Long userId = principal.getUserId();
         String username = principal.getUsername();
 
-        // Register session in the session manager (local + Redis)
+        // Register session in the session manager (local + Redis with TTL)
         sessionManager.registerSession(userId, sessionId);
 
-        log.info("(Connected) WebSocket session established. userId={}, username={}, sessionId={}, " +
-                        "localUsers={}, totalLocalSessions={}",
+        log.info("SESSION_CONNECT: userId={}, username={}, sessionId={}, " +
+                        "localUsers={}, totalSessions={}",
                 userId, username, sessionId,
                 sessionManager.getLocalUserCount(),
                 sessionManager.getTotalLocalSessionCount());
@@ -98,15 +120,14 @@ public class WebSocketEventListener {
 
         Long userId = extractUserIdFromAttributes(accessor);
         if (userId == null) {
-            log.warn("(Skipped) SessionDisconnect without userId. sessionId={}", sessionId);
+            log.warn("SESSION_DISCONNECT: No userId. sessionId={}", sessionId);
             return;
         }
 
         // Remove session from the session manager
         sessionManager.removeSession(userId, sessionId);
 
-        log.info("(Disconnected) WebSocket session closed. userId={}, sessionId={}, " +
-                        "remainingLocalSessions={}, closeStatus={}",
+        log.info("SESSION_DISCONNECT: userId={}, sessionId={}, remainingSessions={}, closeStatus={}",
                 userId, sessionId,
                 sessionManager.getLocalSessionCount(userId),
                 event.getCloseStatus());
@@ -114,6 +135,46 @@ public class WebSocketEventListener {
         // TODO [Phase 4]: If last session on ALL servers → SET presence OFFLINE
         // TODO [Phase 4]: Update MongoDB user_chat_profiles.last_seen
         // TODO [Phase 4]: Publish OFFLINE event to friends
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // TTL RENEWAL — Scheduled Task
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Periodically renews the Redis TTL for all locally connected users' routing keys.
+     * <p>
+     * <b>Why batch renewal instead of per-heartbeat renewal?</b>
+     * <ul>
+     *   <li>STOMP heartbeats are per-connection and happen at the transport layer —
+     *       Spring does not expose a per-heartbeat callback for custom logic.</li>
+     *   <li>A single scheduled task can renew ALL routing keys in one sweep,
+     *       which is more efficient than N individual renewals triggered by N heartbeats.</li>
+     *   <li>The renewal interval (30s) and TTL (90s) are tuned so that the key
+     *       always survives at least 2 missed renewals before expiring.</li>
+     * </ul>
+     * <p>
+     * <b>Failure scenario:</b>
+     * <pre>
+     * t=0s   : Key created with TTL=90s
+     * t=30s  : Renewal → TTL reset to 90s  ✓
+     * t=60s  : Renewal → TTL reset to 90s  ✓
+     * t=90s  : Server crashes, no more renewals
+     * t=180s : Key expires (90s after last renewal) → stale routing cleaned up
+     * </pre>
+     * <p>
+     * Maximum stale window = TTL duration (90s by default).
+     */
+    @Scheduled(fixedDelayString = "${vivumate.websocket.routing.renewal-interval-ms:30000}")
+    public void renewRoutingKeyTtls() {
+        int localUserCount = sessionManager.getLocalUserCount();
+        if (localUserCount == 0) {
+            return; // No users connected, skip
+        }
+
+        int renewed = sessionManager.renewAllRoutingTtls();
+        log.debug("SESSION_HEARTBEAT: renewed={}/{}, totalSessions={}",
+                renewed, localUserCount, sessionManager.getTotalLocalSessionCount());
     }
 
     // ═══════════════════════════════════════════════════════════

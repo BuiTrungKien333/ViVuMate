@@ -68,7 +68,8 @@ public enum ErrorCode {
     // 5xxx: WebSocket
     UNAUTHENTICATED(5001, "error.ws.unauthenticated", HttpStatus.UNAUTHORIZED),
     WS_CONNECTION_LIMIT(5002, "error.ws.connection_limit", HttpStatus.TOO_MANY_REQUESTS),
-    WS_RATE_LIMITED(5003, "error.ws.rate_limited", HttpStatus.TOO_MANY_REQUESTS);
+    WS_RATE_LIMITED(5003, "error.ws.rate_limited", HttpStatus.TOO_MANY_REQUESTS)
+    ;
 
     private final int code;
     private final String messageKey;
