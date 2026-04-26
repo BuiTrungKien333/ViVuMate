@@ -6,7 +6,7 @@ import com.vivumate.coreapi.dto.response.AuthenticationResponse;
 import com.vivumate.coreapi.exception.AppException;
 import com.vivumate.coreapi.exception.ErrorCode;
 import com.vivumate.coreapi.service.AuthenticationService;
-import com.vivumate.coreapi.utils.Translator;
+import com.vivumate.coreapi.util.Translator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -117,6 +117,20 @@ public class AuthenticationController {
     public ApiResponse<AuthenticationResponse> verifyLoginOtp(@RequestBody @Valid VerifyLoginOtpRequest request) {
         log.info("Verify login OTP request received for email={}", request.getEmail());
         return ApiResponse.success(authenticationService.verifyLoginOtp(request));
+    }
+
+    @Operation(summary = "Resend Verification Email",
+            description = "Resends a verification email to the user who has registered but hasn't verified yet. "
+                    + "Includes a 60-second cooldown to prevent spam. "
+                    + "For security, always returns the same response regardless of whether the email exists.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Verification email sent (if eligible)")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1019", description = "Too many requests", content = @Content)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1020", description = "Account already verified", content = @Content)
+    @PostMapping("/resend-verification")
+    public ApiResponse<String> resendVerification(@RequestBody @Valid ResendVerificationRequest request) {
+        log.info("Resend verification request received for email={}", request.getEmail());
+        authenticationService.resendVerification(request);
+        return ApiResponse.success(translator.toLocale("success.auth.resend_verification"));
     }
 
 }

@@ -7,7 +7,7 @@ import com.vivumate.coreapi.dto.response.PageResponse;
 import com.vivumate.coreapi.dto.response.UserMiniResponse;
 import com.vivumate.coreapi.dto.response.UserResponse;
 import com.vivumate.coreapi.service.UserService;
-import com.vivumate.coreapi.utils.Translator;
+import com.vivumate.coreapi.util.Translator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;

@@ -2,9 +2,9 @@ package com.vivumate.coreapi.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.vivumate.coreapi.enums.AuthProvider;
-import com.vivumate.coreapi.enums.Gender;
-import com.vivumate.coreapi.enums.UserStatus;
+import com.vivumate.coreapi.entity.enums.AuthProvider;
+import com.vivumate.coreapi.entity.enums.Gender;
+import com.vivumate.coreapi.entity.enums.UserStatus;
 import lombok.*;
 
 import java.time.LocalDate;

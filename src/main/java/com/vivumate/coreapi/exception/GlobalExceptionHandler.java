@@ -1,7 +1,7 @@
 package com.vivumate.coreapi.exception;
 
 import com.vivumate.coreapi.dto.response.ApiResponse;
-import com.vivumate.coreapi.utils.Translator;
+import com.vivumate.coreapi.util.Translator;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.RequiredArgsConstructor;
@@ -113,6 +113,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(
                 ApiResponse.error(ErrorCode.INVALID_INPUT.getCode(), message));
     }
+
 
     /*
      * Invalid value for enum exception

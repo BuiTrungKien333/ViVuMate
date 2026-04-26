@@ -17,12 +17,26 @@ spring:
   data:
     mongodb:
       uri: mongodb://${MONGO_USER:admin}:${MONGO_PASSWORD:123456}@localhost:${MONGO_PORT:27017}/${MONGO_DB:vivumate_chat}?authSource=admin
+      field-naming-strategy: org.springframework.data.mapping.model.SnakeCaseFieldNamingStrategy
 
     redis:
       host: localhost
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:123456}
 
+####################
+# Dev-specific WebSocket overrides
+vivumate:
+  websocket:
+    session:
+      max-per-user: 10                       # Relaxed for dev/testing (default: 5)
+    rate-limit:
+      max-sends-per-window: 300              # Relaxed for dev/testing (default: 120)
+
 logging:
   level:
     org.springframework.security: DEBUG
+    WEBSOCKET_SESSION_MANAGER: DEBUG
+    WEBSOCKET_EVENT_LISTENER: DEBUG
+    WEBSOCKET_AUTH_INTERCEPTOR: DEBUG
+    WEBSOCKET_RATE_LIMIT_INTERCEPTOR: DEBUG

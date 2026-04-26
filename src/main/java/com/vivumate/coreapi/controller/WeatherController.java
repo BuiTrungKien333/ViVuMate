@@ -3,7 +3,7 @@ package com.vivumate.coreapi.controller;
 import com.vivumate.coreapi.dto.response.ApiResponse;
 import com.vivumate.coreapi.dto.response.WeatherResponse;
 import com.vivumate.coreapi.service.WeatherService;
-import com.vivumate.coreapi.utils.Translator;
+import com.vivumate.coreapi.util.Translator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.*;

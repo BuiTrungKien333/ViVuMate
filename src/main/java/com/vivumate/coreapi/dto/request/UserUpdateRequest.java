@@ -1,6 +1,6 @@
 package com.vivumate.coreapi.dto.request;
 
-import com.vivumate.coreapi.enums.Gender;
+import com.vivumate.coreapi.entity.enums.Gender;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;

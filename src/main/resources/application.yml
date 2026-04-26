@@ -1,12 +1,17 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT}
   servlet:
     encoding:
       charset: UTF-8
       enabled: true
       force: true
 
+####################
 spring:
+  threads:
+    virtual:
+      enabled: true
+
   output:
     ansi:
       enabled: always
@@ -49,6 +54,7 @@ spring:
       enabled: false
       file: docker-compose.yml
 
+####################
 vivumate:
   weather:
     api-key: ${OPENWEATHER_API_KEY}
@@ -72,11 +78,59 @@ vivumate:
       expiration: 300000 # 5 phút
 
   app:
-    frontend-url: ${FRONTEND_URL:http://localhost:3000}
+    frontend-url: ${FRONTEND_URL}
+
+  server:
+    id: ${SERVER_ID:local-dev}
+
+  websocket:
+    # --- Endpoint & Broker ---
+    endpoint: /ws-connect                     # STOMP handshake path
+    app-destination-prefix: /app              # @MessageMapping prefix
+    user-destination-prefix: /user            # convertAndSendToUser prefix
+    broker-destinations:                      # Simple broker destination prefixes
+      - /topic
+      - /queue
+
+    # --- Heartbeat (ms) ---
+    heartbeat:
+      server: 25000                           # Server → Client ping interval
+      client: 25000                           # Expected Client → Server pong interval
+
+    # --- Transport limits ---
+    transport:
+      message-size-limit: 65536              # 64 KB max inbound STOMP frame
+      send-buffer-size-limit: 524288         # 512 KB outbound buffer per session
+      send-time-limit: 20000                 # 20 s max wait for slow consumer
+
+    # --- SockJS fallback ---
+    sockjs:
+      enabled: true
+      stream-bytes-limit: 524288             # 512 KB per streaming response
+      http-message-cache-size: 1000          # Messages cached during transport switch
+      disconnect-delay: 30000                # 30 s before closing idle SockJS session
+
+    # --- Session limits ---
+    session:
+      max-per-user: 5                        # Max concurrent WS connections per user (multi-device)
+
+    # --- Rate limiting ---
+    rate-limit:
+      max-sends-per-window: 120              # Max SEND frames per user per window
+      window-seconds: 60                     # Rate limit window duration (1 minute)
+
+    # --- Cross-server routing ---
+    routing:
+      ttl-seconds: 90                        # TTL for ws_routing:{userId} keys in Redis.
+                                             # Safety net: stale keys auto-expire after this duration if server crashes.
+                                             # Should be 2-3× the renewal interval.
+      renewal-interval-ms: 30000             # How often to batch-renew all routing key TTLs (30s).
+                                             # Must be < ttl-seconds to prevent premature expiry.
 
   openapi:
     dev-url: http://localhost:8080
 
+####################
 management:
   endpoints:
     web:
@@ -88,3 +142,11 @@ management:
       show-details: always
       probes:
         enabled: true
+
+####################
+application:
+  security:
+    cors:
+      allowed-origins:
+        - ${FRONTEND_URL}
+        - "https://vivumate.com"

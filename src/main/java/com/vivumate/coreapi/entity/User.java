@@ -1,8 +1,8 @@
 package com.vivumate.coreapi.entity;
 
-import com.vivumate.coreapi.enums.AuthProvider;
-import com.vivumate.coreapi.enums.Gender;
-import com.vivumate.coreapi.enums.UserStatus;
+import com.vivumate.coreapi.entity.enums.AuthProvider;
+import com.vivumate.coreapi.entity.enums.Gender;
+import com.vivumate.coreapi.entity.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Nationalized;
@@ -65,6 +65,7 @@ public class User extends BaseEntity implements UserDetails {
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
+    @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
     @Enumerated(EnumType.STRING)
@@ -72,6 +73,7 @@ public class User extends BaseEntity implements UserDetails {
     private UserStatus status;
 
     @Column(name = "is_verified")
+    @Builder.Default
     private boolean verified = false;
 
     @Enumerated(EnumType.STRING)
