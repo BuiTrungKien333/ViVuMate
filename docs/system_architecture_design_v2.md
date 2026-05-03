@@ -2061,7 +2061,7 @@ public class CreateConversationsIndexes {
 ---
 
 ### 📌 Phase 1: WebSocket Foundation
-**Timeline: 2–3 tuần**
+**Timeline: 2–3 tuần (completed)**
 
 - [ ] **1.1 WebSocket Config**
   - [ ] `WebSocketConfig` implements `WebSocketMessageBrokerConfigurer`

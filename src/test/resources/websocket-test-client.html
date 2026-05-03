@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ViVuMate — WebSocket Test Client</title>
+    <style>
+        :root {
+            --bg: #0f0f13;
+            --surface: #1a1a24;
+            --border: #2a2a3a;
+            --primary: #6c5ce7;
+            --primary-hover: #7d6ff0;
+            --danger: #e74c3c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --text: #e0e0e0;
+            --text-dim: #888;
+            --font: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px; }
+        h1 { text-align: center; margin-bottom: 6px; font-size: 1.4em; }
+        .subtitle { text-align: center; color: var(--text-dim); font-size: 0.85em; margin-bottom: 20px; }
+
+        .grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; max-width: 1200px; margin: 0 auto; }
+        @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 16px;
+        }
+        .card h2 { font-size: 0.95em; margin-bottom: 12px; color: var(--primary); }
+
+        label { display: block; font-size: 0.78em; color: var(--text-dim); margin-bottom: 4px; margin-top: 10px; }
+        input, textarea, select {
+            width: 100%; padding: 8px 10px; border: 1px solid var(--border);
+            border-radius: 6px; background: var(--bg); color: var(--text);
+            font-family: var(--font); font-size: 0.82em; outline: none;
+        }
+        input:focus, textarea:focus { border-color: var(--primary); }
+        textarea { resize: vertical; min-height: 60px; }
+
+        .btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+        button {
+            padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+            font-family: var(--font); font-size: 0.82em; font-weight: 600;
+            transition: all 0.15s ease;
+        }
+        button:hover { transform: translateY(-1px); }
+        button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-warning { background: var(--warning); color: #111; }
+        .btn-small { padding: 5px 10px; font-size: 0.75em; }
+
+        .status {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.75em; font-weight: 600; margin-left: 8px;
+        }
+        .status.connected { background: rgba(46,204,113,0.15); color: var(--success); }
+        .status.disconnected { background: rgba(231,76,60,0.15); color: var(--danger); }
+        .status.connecting { background: rgba(243,156,18,0.15); color: var(--warning); }
+
+        #console {
+            background: #0a0a10; border: 1px solid var(--border); border-radius: 8px;
+            padding: 12px; font-size: 0.78em; line-height: 1.6;
+            max-height: 600px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+        }
+        .log-connect { color: var(--success); }
+        .log-disconnect { color: var(--danger); }
+        .log-send { color: #3498db; }
+        .log-receive { color: #e67e22; }
+        .log-error { color: #e74c3c; font-weight: bold; }
+        .log-info { color: var(--text-dim); }
+        .log-subscribe { color: #9b59b6; }
+
+        .counter-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+        .counter {
+            background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 12px; text-align: center; flex: 1; min-width: 80px;
+        }
+        .counter .value { font-size: 1.3em; font-weight: bold; color: var(--primary); }
+        .counter .label { font-size: 0.68em; color: var(--text-dim); }
+    </style>
+</head>
+<body>
+
+<h1>🔌 ViVuMate WebSocket Test Client</h1>
+<p class="subtitle">STOMP over WebSocket — Infrastructure Testing Tool</p>
+
+<div class="grid">
+    <!-- LEFT PANEL: Controls -->
+    <div>
+        <!-- Connection Card -->
+        <div class="card">
+            <h2>① Connection
+                <span id="statusBadge" class="status disconnected">DISCONNECTED</span>
+            </h2>
+            <label>Server URL</label>
+            <input id="serverUrl" value="ws://localhost:8080/ws-connect" />
+
+            <label>JWT Access Token</label>
+            <textarea id="jwtToken" placeholder="Paste your access_token here...&#10;&#10;Get one from: POST /api/v1/auth/login"></textarea>
+
+            <div class="btn-row">
+                <button id="btnConnect" class="btn-success" onclick="doConnect()">▶ Connect</button>
+                <button id="btnDisconnect" class="btn-danger" onclick="doDisconnect()" disabled>■ Disconnect</button>
+            </div>
+
+            <label style="margin-top:14px">Quick Login (get token automatically)</label>
+            <input id="loginUrl" value="http://localhost:8080/api/v1/auth/login" />
+            <input id="loginIdentifier" placeholder="username or email" style="margin-top:4px" />
+            <input id="loginPassword" type="password" placeholder="password" style="margin-top:4px" />
+            <div class="btn-row">
+                <button class="btn-warning btn-small" onclick="doQuickLogin()">🔑 Login & Get Token</button>
+            </div>
+        </div>
+
+        <!-- Subscribe Card -->
+        <div class="card" style="margin-top:12px">
+            <h2>② Subscribe</h2>
+            <label>Destination</label>
+            <select id="subDestination">
+                <option value="/user/queue/messages">/user/queue/messages (private messages)</option>
+                <option value="/user/queue/errors">/user/queue/errors (error notifications)</option>
+                <option value="/user/queue/notifications">/user/queue/notifications</option>
+                <option value="/user/queue/sync">/user/queue/sync (multi-device sync)</option>
+                <option value="custom">Custom...</option>
+            </select>
+            <input id="subCustom" placeholder="/topic/conversation/{id}" style="margin-top:4px;display:none" />
+            <div class="btn-row">
+                <button class="btn-primary btn-small" onclick="doSubscribe()" id="btnSubscribe" disabled>Subscribe</button>
+            </div>
+        </div>
+
+        <!-- Send Card -->
+        <div class="card" style="margin-top:12px">
+            <h2>③ Send Message</h2>
+            <label>Destination</label>
+            <input id="sendDestination" value="/app/chat.send" />
+            <label>Payload (JSON)</label>
+            <textarea id="sendPayload" rows="3">{
+  "conversationId": "test-conv-001",
+  "content": "Hello from test client!",
+  "type": "TEXT"
+}</textarea>
+            <div class="btn-row">
+                <button class="btn-primary btn-small" onclick="doSend()" id="btnSend" disabled>Send</button>
+                <button class="btn-warning btn-small" onclick="doFloodTest()" id="btnFlood" disabled>🔥 Flood Test (send ×150)</button>
+            </div>
+        </div>
+
+        <!-- Counters -->
+        <div class="card" style="margin-top:12px">
+            <h2>④ Metrics</h2>
+            <div class="counter-row">
+                <div class="counter"><div class="value" id="cntSent">0</div><div class="label">Sent</div></div>
+                <div class="counter"><div class="value" id="cntReceived">0</div><div class="label">Received</div></div>
+                <div class="counter"><div class="value" id="cntErrors">0</div><div class="label">Errors</div></div>
+            </div>
+            <div class="btn-row" style="margin-top:8px">
+                <button class="btn-small" style="background:var(--border);color:var(--text)" onclick="clearConsole()">🗑 Clear Console</button>
+                <button class="btn-small" style="background:var(--border);color:var(--text)" onclick="resetCounters()">↻ Reset Counters</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: Console -->
+    <div class="card">
+        <h2>Console Output</h2>
+        <div id="console"></div>
+    </div>
+</div>
+
+<!-- STOMP.js via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
+
+<script>
+    // ═══════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════
+    let stompClient = null;
+    let subscriptions = {};
+    let counters = { sent: 0, received: 0, errors: 0 };
+
+    const $ = id => document.getElementById(id);
+
+    // Show/hide custom subscription input
+    $('subDestination').addEventListener('change', e => {
+        $('subCustom').style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+
+    // ═══════════════════════════════════════════════
+    // LOGGING
+    // ═══════════════════════════════════════════════
+    function log(msg, cls = 'log-info') {
+        const time = new Date().toLocaleTimeString('en-US', { hour12: false, fractionalSecondDigits: 3 });
+        const div = $('console');
+        div.innerHTML += `<span class="${cls}">[${time}] ${escapeHtml(msg)}</span>\n`;
+        div.scrollTop = div.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function updateCounters() {
+        $('cntSent').textContent = counters.sent;
+        $('cntReceived').textContent = counters.received;
+        $('cntErrors').textContent = counters.errors;
+    }
+
+    function clearConsole() { $('console').innerHTML = ''; }
+    function resetCounters() { counters = { sent: 0, received: 0, errors: 0 }; updateCounters(); }
+
+    function setStatus(status) {
+        const badge = $('statusBadge');
+        badge.textContent = status.toUpperCase();
+        badge.className = 'status ' + status;
+
+        const connected = status === 'connected';
+        $('btnConnect').disabled = connected;
+        $('btnDisconnect').disabled = !connected;
+        $('btnSubscribe').disabled = !connected;
+        $('btnSend').disabled = !connected;
+        $('btnFlood').disabled = !connected;
+    }
+
+    // ═══════════════════════════════════════════════
+    // QUICK LOGIN
+    // ═══════════════════════════════════════════════
+    async function doQuickLogin() {
+        const url = $('loginUrl').value;
+        const identifier = $('loginIdentifier').value;
+        const password = $('loginPassword').value;
+
+        if (!identifier || !password) {
+            log('⚠ Enter identifier and password first', 'log-error');
+            return;
+        }
+
+        log(`→ POST ${url}  { identifier: "${identifier}" }`, 'log-send');
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ identifier, password })
+            });
+            const data = await res.json();
+
+            if (data.result?.access_token) {
+                $('jwtToken').value = data.result.access_token;
+                log(`✓ Login OK — userId=${data.result.userId}, username=${data.result.username}`, 'log-connect');
+                log(`  Token expires in ${data.result.expires_in}ms`, 'log-info');
+            } else if (data.result?.require_otp) {
+                log('⚠ OTP required — verify via /api/v1/auth/verify-login-otp', 'log-error');
+            } else {
+                log(`✗ Login failed: ${JSON.stringify(data)}`, 'log-error');
+            }
+        } catch (e) {
+            log(`✗ Login error: ${e.message}`, 'log-error');
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // STOMP CONNECTION
+    // ═══════════════════════════════════════════════
+    function doConnect() {
+        const url = $('serverUrl').value;
+        const token = $('jwtToken').value.trim();
+
+        if (!token) {
+            log('⚠ JWT token is required. Use Quick Login or paste one.', 'log-error');
+            return;
+        }
+
+        setStatus('connecting');
+        log(`→ Connecting to ${url}`, 'log-info');
+
+        stompClient = new StompJs.Client({
+            brokerURL: url,
+
+            // STOMP CONNECT headers — this is where JWT auth happens
+            connectHeaders: {
+                'Authorization': `Bearer ${token}`
+            },
+
+            // Debug output
+            debug: function (str) {
+                if (str.includes('>>> PING') || str.includes('<<< PONG')) return; // Skip heartbeat noise
+                log(`  [STOMP] ${str}`, 'log-info');
+            },
+
+            // Heartbeat config (must match server: 25000ms)
+            heartbeatIncoming: 25000,
+            heartbeatOutgoing: 25000,
+
+            reconnectDelay: 0, // Disable auto-reconnect for testing
+
+            onConnect: (frame) => {
+                setStatus('connected');
+                log(`✓ CONNECTED — session=${frame.headers['session'] || 'unknown'}`, 'log-connect');
+                log(`  Server: ${frame.headers['server'] || 'n/a'}, version=${frame.headers['version'] || 'n/a'}`, 'log-info');
+
+                // Auto-subscribe to error queue
+                doSubscribeInternal('/user/queue/errors', (msg) => {
+                    counters.errors++;
+                    updateCounters();
+                    log(`✗ ERROR from server: ${msg.body}`, 'log-error');
+                });
+            },
+
+            onStompError: (frame) => {
+                counters.errors++;
+                updateCounters();
+                setStatus('disconnected');
+                log(`✗ STOMP ERROR: ${frame.headers['message'] || 'Unknown'}`, 'log-error');
+                if (frame.body) log(`  Body: ${frame.body}`, 'log-error');
+            },
+
+            onWebSocketClose: (evt) => {
+                setStatus('disconnected');
+                log(`✗ WebSocket CLOSED — code=${evt.code}, reason="${evt.reason || 'none'}"`, 'log-disconnect');
+            },
+
+            onWebSocketError: (evt) => {
+                counters.errors++;
+                updateCounters();
+                log(`✗ WebSocket ERROR`, 'log-error');
+            }
+        });
+
+        stompClient.activate();
+    }
+
+    function doDisconnect() {
+        if (stompClient) {
+            log('→ Disconnecting...', 'log-info');
+            stompClient.deactivate();
+            stompClient = null;
+            subscriptions = {};
+            setStatus('disconnected');
+            log('✓ Disconnected', 'log-disconnect');
+        }
+    }
+
+    // ═══════════════════════════════════════════════
+    // SUBSCRIBE
+    // ═══════════════════════════════════════════════
+    function doSubscribe() {
+        let dest = $('subDestination').value;
+        if (dest === 'custom') dest = $('subCustom').value;
+        if (!dest) { log('⚠ Enter a destination', 'log-error'); return; }
+
+        doSubscribeInternal(dest, (msg) => {
+            counters.received++;
+            updateCounters();
+            log(`← RECEIVED [${dest}]: ${msg.body}`, 'log-receive');
+        });
+    }
+
+    function doSubscribeInternal(dest, callback) {
+        if (subscriptions[dest]) {
+            log(`⚠ Already subscribed to ${dest}`, 'log-info');
+            return;
+        }
+        const sub = stompClient.subscribe(dest, callback);
+        subscriptions[dest] = sub;
+        log(`✓ SUBSCRIBED to ${dest} (id=${sub.id})`, 'log-subscribe');
+    }
+
+    // ═══════════════════════════════════════════════
+    // SEND
+    // ═══════════════════════════════════════════════
+    function doSend() {
+        const dest = $('sendDestination').value;
+        const body = $('sendPayload').value;
+
+        if (!dest) { log('⚠ Enter a destination', 'log-error'); return; }
+
+        stompClient.publish({ destination: dest, body: body });
+        counters.sent++;
+        updateCounters();
+        log(`→ SENT [${dest}]: ${body.substring(0, 120)}${body.length > 120 ? '...' : ''}`, 'log-send');
+    }
+
+    // ═══════════════════════════════════════════════
+    // FLOOD TEST — Rate Limit Validation
+    // ═══════════════════════════════════════════════
+    async function doFloodTest() {
+        const dest = $('sendDestination').value;
+        const body = $('sendPayload').value;
+        const total = 150; // Exceeds dev limit of 300 if done quickly, definitely exceeds prod limit of 60
+
+        log(`🔥 FLOOD TEST: Sending ${total} messages to ${dest}...`, 'log-error');
+        log(`   Dev limit: 300/60s | Prod limit: 60/60s`, 'log-info');
+
+        let sent = 0;
+        let errors = 0;
+
+        for (let i = 0; i < total; i++) {
+            try {
+                stompClient.publish({
+                    destination: dest,
+                    body: JSON.stringify({ ...JSON.parse(body), _floodSeq: i + 1 })
+                });
+                sent++;
+                counters.sent++;
+            } catch (e) {
+                errors++;
+                counters.errors++;
+            }
+
+            // Small delay to avoid overwhelming the browser
+            if (i % 30 === 0 && i > 0) {
+                updateCounters();
+                await new Promise(r => setTimeout(r, 10));
+            }
+        }
+
+        updateCounters();
+        log(`🔥 FLOOD COMPLETE: sent=${sent}, clientErrors=${errors}`, 'log-error');
+        log(`   Watch server logs for RATE_LIMIT: messages`, 'log-info');
+        log(`   Check Redis: GET ws_rate:{userId}`, 'log-info');
+    }
+</script>
+
+</body>
+</html>
