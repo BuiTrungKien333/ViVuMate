@@ -3,6 +3,7 @@ package com.vivumate.coreapi.service.impl;
 import com.vivumate.coreapi.document.ConversationDocument;
 import com.vivumate.coreapi.document.MessageDocument;
 import com.vivumate.coreapi.document.enums.ContentType;
+import com.vivumate.coreapi.document.enums.ConversationType;
 import com.vivumate.coreapi.document.enums.MentionType;
 import com.vivumate.coreapi.document.subdoc.*;
 import com.vivumate.coreapi.dto.response.UserMiniResponse;
@@ -15,6 +16,7 @@ import com.vivumate.coreapi.service.MessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
+
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -49,23 +51,38 @@ public class MessageServiceImpl implements MessageService {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public MessageDocument sendMessage(ObjectId conversationId, Long senderUserId,
-                                        ContentType contentType, MessageContent content,
-                                        List<Mention> mentions, ReplyToSnapshot replyTo) {
+    public SendMessageResult sendMessage(ObjectId conversationId, Long senderUserId,
+                                         String clientMessageId,
+                                         ContentType contentType, MessageContent content,
+                                         List<Mention> mentions, ReplyToSnapshot replyTo) {
+
         // 1. Validate the sender is a participant
         ConversationDocument conversation = conversationRepository.findByIdAndParticipantId(conversationId, senderUserId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_ACCESS_DENIED));
 
+        // Precompute participant lists (used for both new + duplicate paths)
+        List<Long> allParticipantIds = conversation.getParticipantIds();
+        List<Long> recipientIds = allParticipantIds.stream()
+                .filter(id -> !id.equals(senderUserId))
+                .toList();
+
         // 2. Build sender snapshot from PostgreSQL
-        /*
-        Nếu như tin nhắn này thuộc GROUP thì SenderSnapshot mới cần đủ thông tin (userId, username, full_name, avatar_url)
-        Còn nếu là tin nhắn DIRECT thì lấy trực tiếp tại conversation đó luôn (lấy userId để biết ai gửi là được rồi)
-         */
-        SenderSnapshot sender = buildSenderSnapshot(senderUserId);
+        SenderSnapshot sender = null;
+        if(conversation.getType().equals(ConversationType.DIRECT)) {
+            sender = SenderSnapshot.builder()
+                    .userId(senderUserId)
+                    .build();
+        } else if(conversation.getType().equals(ConversationType.GROUP)) {
+            sender = buildSenderSnapshot(senderUserId);
+        }
 
         // 3. Persist the message
+        // clientMessageId is stored for ACK correlation and multi-device broadcast dedup.
+        // NOTE: If duplicate messages become a problem in the future, add a unique sparse
+        // index on {sender.user_id, client_message_id} — the field is already here.
         MessageDocument message = MessageDocument.builder()
                 .conversationId(conversationId)
+                .clientMessageId(clientMessageId)
                 .sender(sender)
                 .contentType(contentType)
                 .content(content)
@@ -80,9 +97,6 @@ public class MessageServiceImpl implements MessageService {
         conversationRepository.updateLastMessage(conversationId, preview);
 
         // 5. Increment unread counts for all participants except sender
-        List<Long> recipientIds = conversation.getParticipantIds().stream()
-                .filter(id -> !id.equals(senderUserId))
-                .toList();
         conversationRepository.incrementUnreadCounts(conversationId, recipientIds);
 
         // 6. Increment unread mention counts (if applicable)
@@ -91,14 +105,66 @@ public class MessageServiceImpl implements MessageService {
             conversationRepository.incrementUnreadMentionsCounts(conversationId, mentionedUserIds);
         }
 
-        log.info("Message sent: id={}, conversationId={}, sender={}, type={}",
-                saved.getId(), conversationId, senderUserId, contentType);
+        log.info("Message sent: id={}, conversationId={}, sender={}, type={}, clientMessageId={}",
+                saved.getId(), conversationId, senderUserId, contentType, clientMessageId);
 
-        // TODO: Publish event for real-time delivery (WebSocket/Push Notification)
-        // eventPublisher.publishEvent(new MessageSentEvent(saved, recipientIds));
-
-        return saved;
+        return new SendMessageResult(saved, recipientIds, allParticipantIds);
     }
+
+    // nếu cần xử lý trùng message khi insert thì dùng cái này
+//    public SendMessageResult sendMessage1(ObjectId conversationId, Long senderUserId,
+//                                         String clientMessageId,
+//                                         ContentType contentType, MessageContent content,
+//                                         List<Mention> mentions, ReplyToSnapshot replyTo) {
+//        // 1. Validate the sender is a participant
+//        ConversationDocument conversation = conversationRepository.findByIdAndParticipantId(conversationId, senderUserId)
+//                .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_ACCESS_DENIED));
+//        // Precompute participant lists (used for both new + duplicate paths)
+//        List<Long> allParticipantIds = conversation.getParticipantIds();
+//        List<Long> recipientIds = allParticipantIds.stream()
+//                .filter(id -> !id.equals(senderUserId))
+//                .toList();
+//        // 2. Build sender snapshot from PostgreSQL
+//        SenderSnapshot sender = buildSenderSnapshot(senderUserId);
+//         3. Persist the message (with clientMessageId for Layer 2 idempotency)
+//        MessageDocument message = MessageDocument.builder()
+//                .conversationId(conversationId)
+//                .clientMessageId(clientMessageId)
+//                .sender(sender)
+//                .contentType(contentType)
+//                .content(content)
+//                .mentions(mentions != null ? mentions : Collections.emptyList())
+//                .replyTo(replyTo)
+//                .build();
+//        MessageDocument saved;
+//        try {
+//            saved = messageRepository.save(message);
+//        } catch (DuplicateKeyException e) {
+//            // ──── Layer 2 Idempotency ────
+//            // MongoDB unique index {sender.user_id, client_message_id} caught a duplicate.
+//            // This happens when the client retries after Redis idempotency key expired
+//            // (e.g., reconnect after 5+ hours). Return the existing message as duplicate.
+//            log.info("Duplicate message detected (MongoDB Layer 2): clientMessageId={}, sender={}",
+//                    clientMessageId, senderUserId);
+//            saved = messageRepository.findBySenderUserIdAndClientMessageId(senderUserId, clientMessageId)
+//                    .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
+//            return new SendMessageResult(saved, recipientIds, allParticipantIds, true);
+//        }
+//
+//        // 4. Update lastMessage preview (Subset Pattern)
+//        LastMessagePreview preview = buildLastMessagePreview(saved, sender);
+//        conversationRepository.updateLastMessage(conversationId, preview);
+//        // 5. Increment unread counts for all participants except sender
+//        conversationRepository.incrementUnreadCounts(conversationId, recipientIds);
+//        // 6. Increment unread mention counts (if applicable)
+//        List<Long> mentionedUserIds = extractMentionedUserIds(mentions, conversation.getParticipantIds(), senderUserId);
+//        if (!mentionedUserIds.isEmpty()) {
+//            conversationRepository.incrementUnreadMentionsCounts(conversationId, mentionedUserIds);
+//        }
+//        log.info("Message sent: id={}, conversationId={}, sender={}, type={}, clientMessageId={}",
+//                saved.getId(), conversationId, senderUserId, contentType, clientMessageId);
+//        return new SendMessageResult(saved, recipientIds, allParticipantIds, false);
+//    }
 
     // ═══════════════════════════════════════════════════════════
     //  LOAD MESSAGES
@@ -106,7 +172,7 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public List<MessageDocument> loadMessages(ObjectId conversationId, Long currentUserId,
-                                               ObjectId cursor, int pageSize) {
+                                              ObjectId cursor, int pageSize) {
         // 1. Get the user's clearedAt watermark
         Instant clearedAt = getClearedAt(conversationId, currentUserId);
 
@@ -118,7 +184,7 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public List<MessageDocument> searchMessages(ObjectId conversationId, Long currentUserId,
-                                                 String keyword, int pageSize) {
+                                                String keyword, int pageSize) {
         Instant clearedAt = getClearedAt(conversationId, currentUserId);
         return messageRepository.searchMessages(conversationId, currentUserId, clearedAt, keyword, pageSize);
     }
@@ -262,7 +328,7 @@ public class MessageServiceImpl implements MessageService {
      * Otherwise, do nothing (non-last messages don't affect conversation list).
      */
     private void updateLastMessageIfNeeded(ObjectId conversationId, ObjectId messageId,
-                                            Long senderUserId, MessageContent newContent) {
+                                           Long senderUserId, MessageContent newContent) {
         ConversationDocument conversation = conversationRepository.findById(conversationId).orElse(null);
         if (conversation == null) return;
 

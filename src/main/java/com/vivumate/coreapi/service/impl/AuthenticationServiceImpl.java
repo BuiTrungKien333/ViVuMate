@@ -131,16 +131,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         var user = (User) authentication.getPrincipal();
 
         // Suspicious login detection: inactive > 30 days
-        if (isSuspiciousLogin(user)) {
-            log.warn("Suspicious login detected for user: {} - requiring OTP", user.getUsername());
-            final String otp = generateOtp();
-            redisService.saveLoginOtp(user.getEmail(), otp, otpExpiration);
-            emailService.sendLoginOtpEmail(user.getEmail(), user.getFullName(), otp);
-
-            return AuthenticationResponse.builder()
-                    .requireOtp(true)
-                    .build();
-        }
+//        if (isSuspiciousLogin(user)) {
+//            log.warn("Suspicious login detected for user: {} - requiring OTP", user.getUsername());
+//            final String otp = generateOtp();
+//            redisService.saveLoginOtp(user.getEmail(), otp, otpExpiration);
+//            emailService.sendLoginOtpEmail(user.getEmail(), user.getFullName(), otp);
+//
+//            return AuthenticationResponse.builder()
+//                    .requireOtp(true)
+//                    .build();
+//        }
 
         user.setLastLoginAt(LocalDateTime.now());
         user.setLastSeen(LocalDateTime.now());

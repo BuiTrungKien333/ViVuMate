@@ -80,7 +80,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final String endpoint;
     private final String appDestinationPrefix;
     private final String userDestinationPrefix;
-    private final List<String> brokerDestinations;
+    private final String[] brokerDestinations;
 
     // --- Heartbeat ---
     private final long heartbeatServer;
@@ -98,7 +98,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final long sockjsDisconnectDelay;
 
     // --- CORS ---
-    private final List<String> allowedOrigins;
+    private final String[] allowedOrigins;
 
     public WebSocketConfig(
             WebSocketAuthInterceptor authInterceptor,
@@ -106,7 +106,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             @Value("${vivumate.websocket.endpoint:/ws-connect}") String endpoint,
             @Value("${vivumate.websocket.app-destination-prefix:/app}") String appDestinationPrefix,
             @Value("${vivumate.websocket.user-destination-prefix:/user}") String userDestinationPrefix,
-            @Value("${vivumate.websocket.broker-destinations}") List<String> brokerDestinations,
+            @Value("${vivumate.websocket.broker-destinations}") String[] brokerDestinations,
             @Value("${vivumate.websocket.heartbeat.server:25000}") long heartbeatServer,
             @Value("${vivumate.websocket.heartbeat.client:25000}") long heartbeatClient,
             @Value("${vivumate.websocket.transport.message-size-limit:65536}") int messageSizeLimit,
@@ -116,7 +116,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
             @Value("${vivumate.websocket.sockjs.stream-bytes-limit:524288}") int sockjsStreamBytesLimit,
             @Value("${vivumate.websocket.sockjs.http-message-cache-size:1000}") int sockjsHttpMessageCacheSize,
             @Value("${vivumate.websocket.sockjs.disconnect-delay:30000}") long sockjsDisconnectDelay,
-            @Value("${application.security.cors.allowed-origins}") List<String> allowedOrigins) {
+            @Value("${application.security.cors.allowed-origins}") String[] allowedOrigins) {
 
         this.authInterceptor = authInterceptor;
         this.rateLimitInterceptor = rateLimitInterceptor;
@@ -193,9 +193,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        String[] destinations = brokerDestinations.toArray(String[]::new);
-
-        registry.enableSimpleBroker(destinations)
+        registry.enableSimpleBroker(brokerDestinations)
                 .setHeartbeatValue(new long[]{heartbeatServer, heartbeatClient})
                 .setTaskScheduler(createHeartbeatScheduler());
 
@@ -204,7 +202,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         log.info("Message broker configured: destinations={}, heartbeat=[server={}ms, client={}ms], " +
                         "appPrefix={}, userPrefix={}",
-                brokerDestinations, heartbeatServer, heartbeatClient,
+                List.of(brokerDestinations), heartbeatServer, heartbeatClient,
                 appDestinationPrefix, userDestinationPrefix);
     }
 
@@ -233,25 +231,23 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      */
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        String[] origins = allowedOrigins.toArray(String[]::new);
-
         // Primary: native WebSocket (mobile apps, modern browsers)
         registry.addEndpoint(endpoint)
-                .setAllowedOrigins(origins);
+                .setAllowedOrigins(allowedOrigins);
 
         // Optional fallback: SockJS for environments where WebSocket is blocked
         if (sockjsEnabled) {
             registry.addEndpoint(endpoint)
-                    .setAllowedOrigins(origins)
+                    .setAllowedOrigins(allowedOrigins)
                     .withSockJS()
                     .setStreamBytesLimit(sockjsStreamBytesLimit)
                     .setHttpMessageCacheSize(sockjsHttpMessageCacheSize)
                     .setDisconnectDelay(sockjsDisconnectDelay);
 
-            log.info("STOMP endpoints registered: {} (WebSocket + SockJS), allowedOrigins={}", endpoint, allowedOrigins);
+            log.info("STOMP endpoints registered: {} (WebSocket + SockJS), allowedOrigins={}", endpoint, List.of(allowedOrigins));
         } else {
             log.info("STOMP endpoints registered: {} (WebSocket only, SockJS disabled), allowedOrigins={}",
-                    endpoint, allowedOrigins);
+                    endpoint, List.of(allowedOrigins));
         }
     }
 

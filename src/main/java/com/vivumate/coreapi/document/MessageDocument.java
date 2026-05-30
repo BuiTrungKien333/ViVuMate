@@ -54,6 +54,18 @@ public class MessageDocument extends BaseDocument {
      */
     private ObjectId conversationId;
 
+    /**
+     * Client-generated UUID for idempotency.
+     * <p>
+     * Combined with {@code sender.userId}, forms a unique compound index
+     * that provides <b>permanent</b> duplicate detection — even after the
+     * Redis idempotency key expires (Layer 2 safety net).
+     * <p>
+     * Sparse index: old messages without this field are not indexed.
+     */
+    @Field("client_message_id")
+    private String clientMessageId;
+
     // ═══════════════════════════════════════════════════════════
     // SENDER — (Extended Reference Pattern)
     // ═══════════════════════════════════════════════════════════

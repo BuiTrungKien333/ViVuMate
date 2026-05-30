@@ -1,9 +1,10 @@
-package com.vivumate.coreapi.repository.mongodb;
+package com.vivumate.coreapi.repository.mongodb.impl;
 
 import com.vivumate.coreapi.document.MessageDocument;
 import com.vivumate.coreapi.document.subdoc.EditHistoryEntry;
 import com.vivumate.coreapi.document.subdoc.MessageContent;
 import com.mongodb.client.result.UpdateResult;
+import com.vivumate.coreapi.repository.mongodb.MessageCustomRepository;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;

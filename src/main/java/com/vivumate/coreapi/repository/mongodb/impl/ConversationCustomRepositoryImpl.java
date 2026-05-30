@@ -1,10 +1,11 @@
-package com.vivumate.coreapi.repository.mongodb;
+package com.vivumate.coreapi.repository.mongodb.impl;
 
 import com.vivumate.coreapi.document.ConversationDocument;
 import com.vivumate.coreapi.document.enums.ParticipantRole;
 import com.vivumate.coreapi.document.subdoc.LastMessagePreview;
 import com.vivumate.coreapi.document.subdoc.Participant;
 import com.mongodb.client.result.UpdateResult;
+import com.vivumate.coreapi.repository.mongodb.ConversationCustomRepository;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Sort;

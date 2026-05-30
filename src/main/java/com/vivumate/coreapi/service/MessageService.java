@@ -16,13 +16,49 @@ public interface MessageService {
     // ═══════════════════════════════════════════════════════════
 
     /**
-     * Send a new message to a conversation.
-     * Side effects: update lastMessage, increment unread counts,
-     * increment unread mentions (if applicable).
+     * Result wrapper for {@link #sendMessage}.
+     * <p>
+     * Provides the handler with everything it needs to ACK the sender
+     * and broadcast to participants — without requiring a second DB query.
+     *
+     * @param savedMessage       the persisted (or existing duplicate) message
+     * @param savedMessage       the persisted message document
+     * @param recipientIds       participant IDs excluding the sender (for unread/mention tracking)
+     * @param allParticipantIds  all participant IDs including the sender (for multi-device broadcast)
+//   * @param duplicate          {@code true} if MongoDB unique index detected a duplicate
      */
-    MessageDocument sendMessage(ObjectId conversationId, Long senderUserId,
-                                ContentType contentType, MessageContent content,
-                                List<Mention> mentions, ReplyToSnapshot replyTo);
+    record SendMessageResult(
+            MessageDocument savedMessage,
+            List<Long> recipientIds,
+            List<Long> allParticipantIds
+//            boolean duplicate
+    ) {}
+
+    /**
+     * Send a new message to a conversation.
+     * <p>
+     * <b>Side effects (on new message):</b>
+     * <ul>
+     *   <li>Update {@code lastMessage} preview on the conversation</li>
+     *   <li>Increment unread counts for all participants except sender</li>
+     *   <li>Increment unread mention counts (if applicable)</li>
+     * </ul>
+     * <b>On duplicate ({@code clientMessageId} already exists):</b>
+     * returns the existing message with {@code duplicate=true}, no side effects.
+     *
+     * @param conversationId  target conversation
+     * @param senderUserId    authenticated sender's PostgreSQL user ID
+     * @param clientMessageId client-generated UUID for idempotency (Layer 2)
+     * @param contentType     message content type discriminator
+     * @param content         polymorphic message content
+     * @param mentions        optional list of @mentions
+     * @param replyTo         optional reply-to snapshot
+     * @return result containing saved message, recipient lists, and duplicate flag
+     */
+    SendMessageResult sendMessage(ObjectId conversationId, Long senderUserId,
+                                  String clientMessageId,
+                                  ContentType contentType, MessageContent content,
+                                  List<Mention> mentions, ReplyToSnapshot replyTo);
 
     // ═══════════════════════════════════════════════════════════
     //  LOAD MESSAGES

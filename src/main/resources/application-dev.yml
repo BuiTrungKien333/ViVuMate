@@ -29,7 +29,7 @@ spring:
 vivumate:
   websocket:
     session:
-      max-per-user: 10                       # Relaxed for dev/testing (default: 5)
+      max-per-user: 5                       # Relaxed for dev/testing (default: 5)
     rate-limit:
       max-sends-per-window: 300              # Relaxed for dev/testing (default: 120)
 
@@ -40,3 +40,10 @@ logging:
     WEBSOCKET_EVENT_LISTENER: DEBUG
     WEBSOCKET_AUTH_INTERCEPTOR: DEBUG
     WEBSOCKET_RATE_LIMIT_INTERCEPTOR: DEBUG
+
+
+####################
+application:
+  security:
+    cors:
+      allowed-origins: file://,null

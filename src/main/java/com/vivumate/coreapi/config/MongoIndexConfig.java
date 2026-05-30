@@ -66,6 +66,17 @@ public class MongoIndexConfig {
                 .defaultLanguage("none");
         mongoTemplate.getCollection("messages").createIndex(compoundTextIndex, textIndexOptions);
 
+        // 2.2 Idempotency: unique compound index {sender.user_id, client_message_id}
+        // Permanent Layer 2 dedup — catches duplicates even after Redis key expires.
+        // Sparse: old messages without client_message_id are NOT indexed.
+        // bao giờ muốn xử lý duplicate message khi retry thì dùng thêm index này
+//        messageOps.createIndex(new Index()
+//                .on("sender.user_id", Sort.Direction.ASC)
+//                .on("client_message_id", Sort.Direction.ASC)
+//                .unique()
+//                .sparse()
+//                .named("idx_sender_clientMsgId_unique"));
+
         log.info("MongoDB Indexes initialized successfully.");
     }
 }

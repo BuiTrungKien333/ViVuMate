@@ -32,7 +32,7 @@ public class AuthenticationController {
             +
             "The Access Token is required to access protected endpoints.")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1004", description = "Invalid username or password", content = @Content)
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "1001", description = "Invalid username or password", content = @Content)
     @PostMapping("/login")
     public ApiResponse<AuthenticationResponse> login(@RequestBody @Valid AuthenticationRequest request) {
         log.info("Login request received for identifier={}", request.getIdentifier());

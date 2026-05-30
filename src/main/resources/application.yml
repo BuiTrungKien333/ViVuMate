@@ -88,9 +88,7 @@ vivumate:
     endpoint: /ws-connect                     # STOMP handshake path
     app-destination-prefix: /app              # @MessageMapping prefix
     user-destination-prefix: /user            # convertAndSendToUser prefix
-    broker-destinations:                      # Simple broker destination prefixes
-      - /topic
-      - /queue
+    broker-destinations: /topic,/queue         # Simple broker destination prefixes
 
     # --- Heartbeat (ms) ---
     heartbeat:
@@ -147,6 +145,4 @@ management:
 application:
   security:
     cors:
-      allowed-origins:
-        - ${FRONTEND_URL}
-        - "https://vivumate.com"
+      allowed-origins: http://localhost:3000,https://vivumate.com

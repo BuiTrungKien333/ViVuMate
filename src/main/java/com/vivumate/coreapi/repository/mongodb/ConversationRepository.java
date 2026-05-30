@@ -1,8 +1,8 @@
 package com.vivumate.coreapi.repository.mongodb;
 
-import com.mongodb.bulk.BulkWriteResult;
 import com.vivumate.coreapi.document.ConversationDocument;
 import com.vivumate.coreapi.document.enums.ConversationType;
+import com.vivumate.coreapi.repository.mongodb.impl.ConversationCustomRepositoryImpl;
 import org.bson.types.ObjectId;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
