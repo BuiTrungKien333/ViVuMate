@@ -23,5 +23,7 @@ public class SenderSnapshot {
 
     private String fullName;
 
+    private String nickname;
+
     private String avatarUrl;
 }

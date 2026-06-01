@@ -165,6 +165,8 @@ public class UserServiceImpl implements UserService {
         return UserMapper.toUserResponse(user);
     }
 
+    // TODO: nên chuyển sang dùng redis để lưu trạng thái online/offline
+    // còn postgre thì chỉ lưu lastSeen thôi
     @Transactional
     @Override
     public void updateOnlineStatus(Long userId, boolean online) {

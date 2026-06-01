@@ -66,14 +66,29 @@ public class MessageServiceImpl implements MessageService {
                 .filter(id -> !id.equals(senderUserId))
                 .toList();
 
-        // 2. Build sender snapshot from PostgreSQL
+        // 2. Build sender snapshot
         SenderSnapshot sender = null;
-        if(conversation.getType().equals(ConversationType.DIRECT)) {
+        if (conversation.getType().equals(ConversationType.DIRECT)) {
             sender = SenderSnapshot.builder()
                     .userId(senderUserId)
                     .build();
-        } else if(conversation.getType().equals(ConversationType.GROUP)) {
-            sender = buildSenderSnapshot(senderUserId);
+        } else if (conversation.getType().equals(ConversationType.GROUP)) {
+            sender = conversation.getParticipants().stream()
+                    .filter(p -> p.getUserId().equals(senderUserId))
+                    .findFirst()
+                    .map(p -> SenderSnapshot.builder()
+                            .userId(p.getUserId())
+                            .username(p.getUsername())
+                            .nickname(p.getNickname())
+                            .fullName(p.getFullName())
+                            .avatarUrl(p.getAvatarUrl())
+                            .build())
+                    .orElse(null);
+
+            if (sender == null) {
+                log.warn("Sender {} not found in participant list of group {}, falling back to database query", senderUserId, conversationId);
+                sender = buildSenderSnapshot(senderUserId); // Fallback query DB
+            }
         }
 
         // 3. Persist the message
@@ -287,7 +302,7 @@ public class MessageServiceImpl implements MessageService {
         return LastMessagePreview.builder()
                 .messageId(message.getId())
                 .senderId(sender.getUserId())
-                .senderName(sender.getFullName())
+                .senderName(sender.getUsername() != null ? sender.getUsername() : sender.getFullName())
                 .contentPreview(contentPreview)
                 .contentType(message.getContentType())
                 .sentAt(message.getCreatedAt())
