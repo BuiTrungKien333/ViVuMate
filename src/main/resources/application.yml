@@ -67,7 +67,7 @@ vivumate:
     verifyKey: ${JWT_VERIFY_KEY}
 
     access:
-      expiration: 1800000 # 30 phút
+      expiration: 900000 # 15 phút
     refresh:
       expiration: 604800000 # 7 ngày
     reset:
@@ -75,7 +75,7 @@ vivumate:
     verify:
       expiration: 900000 # 15 phút
     otp-login:
-      expiration: 300000 # 5 phút
+      expiration: 600000 # 10 phút
 
   app:
     frontend-url: ${FRONTEND_URL}

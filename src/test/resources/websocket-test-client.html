@@ -142,10 +142,13 @@
             <label>Destination</label>
             <input id="sendDestination" value="/app/chat.send" />
             <label>Payload (JSON)</label>
-            <textarea id="sendPayload" rows="3">{
-  "conversationId": "test-conv-001",
-  "content": "Hello from test client!",
-  "type": "TEXT"
+            <textarea id="sendPayload" rows="6">{
+  "clientMessageId": "test-uuid-001",
+  "conversationId": "PASTE_CONVERSATION_ID_HERE",
+  "contentType": "TEXT",
+  "content": { "text": "Hello from WebSocket test client!" },
+  "mentions": [],
+  "replyTo": null
 }</textarea>
             <div class="btn-row">
                 <button class="btn-primary btn-small" onclick="doSend()" id="btnSend" disabled>Send</button>
@@ -305,12 +308,26 @@
                 log(`✓ CONNECTED — session=${frame.headers['session'] || 'unknown'}`, 'log-connect');
                 log(`  Server: ${frame.headers['server'] || 'n/a'}, version=${frame.headers['version'] || 'n/a'}`, 'log-info');
 
-                // Auto-subscribe to error queue
+                // Auto-subscribe to essential queues
                 doSubscribeInternal('/user/queue/errors', (msg) => {
                     counters.errors++;
                     updateCounters();
                     log(`✗ ERROR from server: ${msg.body}`, 'log-error');
                 });
+
+                doSubscribeInternal('/user/queue/ack', (msg) => {
+                    counters.received++;
+                    updateCounters();
+                    log(`✓ ACK received: ${msg.body}`, 'log-connect');
+                });
+
+                doSubscribeInternal('/user/queue/messages', (msg) => {
+                    counters.received++;
+                    updateCounters();
+                    log(`← BROADCAST received: ${msg.body}`, 'log-receive');
+                });
+
+                log(`  Auto-subscribed to: /user/queue/errors, /user/queue/ack, /user/queue/messages`, 'log-subscribe');
             },
 
             onStompError: (frame) => {
