@@ -141,12 +141,31 @@ public class ConversationCustomRepositoryImpl implements ConversationCustomRepos
     }
 
     // ═══════════════════════════════════════════════════════════
-    // LAST MESSAGE — Subset Pattern update
+    // LAST MESSAGE — Subset Pattern update (Race-condition safe)
     // ═══════════════════════════════════════════════════════════
 
+    /**
+     * Atomically updates the conversation's lastMessage preview,
+     * but ONLY if the new message is newer than the existing preview.
+     * <p>
+     * <b>Race condition protection:</b> When two messages (M1, M2) are sent
+     * concurrently to the same conversation, M2 may persist first but M1's
+     * updateLastMessage could execute after M2's. Without this guard,
+     * M1 (older) would overwrite M2's preview → conversation list shows wrong message.
+     * <p>
+     * The query uses: {@code _id = conversationId AND (lastMessage.sentAt <= newSentAt OR lastMessage IS NULL)}
+     * <br>If the existing preview is already newer, the query matches 0 documents → no-op.
+     */
     @Override
     public UpdateResult updateLastMessage(ObjectId conversationId, LastMessagePreview preview) {
-        Query query = new Query(Criteria.where("_id").is(conversationId));
+        // Conditional update: only proceed if new message is newer or lastMessage doesn't exist yet
+        Query query = new Query(new Criteria().andOperator(
+                Criteria.where("_id").is(conversationId),
+                new Criteria().orOperator(
+                        Criteria.where("lastMessage.sentAt").lte(preview.getSentAt()),
+                        Criteria.where("lastMessage").isNull()
+                )
+        ));
 
         Update update = new Update()
                 .set("lastMessage", preview)

@@ -18,10 +18,20 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * STOMP Channel Interceptor that enforces per-user rate limiting
- * on outbound SEND frames (i.e., messages sent by clients).
+ * STOMP Channel Interceptor that enforces <b>destination security</b>
+ * and <b>per-user rate limiting</b> on inbound SEND frames.
  * <p>
- * <b>Algorithm:</b> Fixed-window counter using Redis INCR + EXPIRE.
+ * <b>Destination Security (Defense-in-depth):</b>
+ * <ul>
+ *   <li>Clients may only SEND to {@code /app/*} destinations (application layer)</li>
+ *   <li>SEND to broker destinations ({@code /topic/*}, {@code /queue/*}, {@code /user/*})
+ *       is <b>rejected immediately</b> — these destinations are server-to-client only</li>
+ *   <li>Without this guard, an authenticated user could craft a STOMP SEND frame
+ *       to {@code /topic/conversation/{id}} or {@code /user/queue/messages} to
+ *       inject fake events into other users' subscriptions</li>
+ * </ul>
+ * <p>
+ * <b>Rate Limiting Algorithm:</b> Fixed-window counter using Redis INCR + EXPIRE.
  * <ul>
  *   <li>Key: {@code ws_rate:{userId}} — counter per user</li>
  *   <li>TTL: configurable window (default: 60 seconds)</li>
@@ -48,6 +58,12 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
 
     private static final String RATE_LIMIT_KEY_PREFIX = "ws_rate:";
 
+    /**
+     * Only destinations starting with this prefix are allowed for client SEND.
+     * All other destinations (/topic/*, /queue/*, /user/*) are server-to-client only.
+     */
+    private static final String ALLOWED_SEND_PREFIX = "/app/";
+
     private final StringRedisTemplate redisTemplate;
 
     /**
@@ -70,8 +86,15 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
     }
 
     /**
-     * Intercepts SEND frames and checks the user's rate limit.
+     * Intercepts SEND frames and enforces destination security + rate limiting.
      * Non-SEND frames (SUBSCRIBE, UNSUBSCRIBE, etc.) pass through unchecked.
+     * <p>
+     * <b>Processing order:</b>
+     * <ol>
+     *   <li>Destination security — reject SEND to non-{@code /app/*} destinations (no Redis cost)</li>
+     *   <li>Authentication check — ensure principal exists</li>
+     *   <li>Rate limit — Redis INCR counter check</li>
+     * </ol>
      *
      * @param message the inbound STOMP message
      * @param channel the message channel
@@ -86,7 +109,17 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
             return message;
         }
 
-        // Extract userId from the authenticated principal
+        // ── Destination Security: only allow SEND to /app/* ──
+        String destination = accessor.getDestination();
+        if (destination == null || !destination.startsWith(ALLOWED_SEND_PREFIX)) {
+            log.warn("DESTINATION_DENIED: Client attempted SEND to forbidden destination. " +
+                            "destination={}, sessionId={}, user={}",
+                    destination, accessor.getSessionId(),
+                    accessor.getUser() != null ? accessor.getUser().getName() : "unknown");
+            return null; // Silently drop the frame — do not reveal internal routing info
+        }
+
+        // ── Authentication check ──
         StompPrincipal principal = (StompPrincipal) accessor.getUser();
         if (principal == null) {
             // Unauthenticated SEND — should not happen if auth interceptor is configured correctly
@@ -94,6 +127,7 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
             return null;
         }
 
+        // ── Rate Limiting: Redis fixed-window counter ──
         Long userId = principal.getUserId();
         String rateLimitKey = RATE_LIMIT_KEY_PREFIX + userId;
 
@@ -111,7 +145,6 @@ public class WebSocketRateLimitInterceptor implements ChannelInterceptor {
         }
 
         if (currentCount > maxSendsPerWindow) {
-            String destination = accessor.getDestination();
             log.warn("RATE_LIMIT: Exceeded. userId={}, count={}, limit={}/{}, destination={}",
                     userId, currentCount, maxSendsPerWindow, windowDuration.getSeconds() + "s", destination);
             throw new AppException(ErrorCode.WS_RATE_LIMITED);
