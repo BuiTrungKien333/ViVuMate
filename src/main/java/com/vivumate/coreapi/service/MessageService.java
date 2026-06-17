@@ -83,20 +83,55 @@ public interface MessageService {
     // ═══════════════════════════════════════════════════════════
 
     /**
+     * Result wrapper for {@link #editMessage}.
+     * Provides participant IDs for WebSocket broadcast after REST mutation.
+     *
+     * @param conversationId  the conversation containing the edited message
+     * @param messageId       the edited message's ID
+     * @param newContent      the updated content (for broadcast payload)
+     * @param allParticipantIds  all participant IDs for broadcasting the edit event
+     */
+    record EditMessageResult(
+            ObjectId conversationId,
+            ObjectId messageId,
+            MessageContent newContent,
+            List<Long> allParticipantIds
+    ) {}
+
+    /**
+     * Result wrapper for {@link #recallMessage}.
+     * Provides participant IDs for WebSocket broadcast after REST mutation.
+     *
+     * @param conversationId  the conversation containing the recalled message
+     * @param messageId       the recalled message's ID
+     * @param allParticipantIds  all participant IDs for broadcasting the recall event
+     */
+    record RecallMessageResult(
+            ObjectId conversationId,
+            ObjectId messageId,
+            List<Long> allParticipantIds
+    ) {}
+
+    /**
      * Edit a message's content. Only the original sender can edit.
      * If the edited message is the lastMessage, update the preview.
+     *
+     * @return result containing participant IDs for WebSocket broadcast
      */
-    void editMessage(ObjectId conversationId, ObjectId messageId,
-                     Long senderUserId, MessageContent newContent);
+    EditMessageResult editMessage(ObjectId conversationId, ObjectId messageId,
+                                  Long senderUserId, MessageContent newContent);
 
     /**
      * Recall (delete for everyone). Only the original sender can recall.
      * If the recalled message is the lastMessage, find and set the penultimate message.
+     *
+     * @return result containing participant IDs for WebSocket broadcast
      */
-    void recallMessage(ObjectId conversationId, ObjectId messageId, Long senderUserId);
+    RecallMessageResult recallMessage(ObjectId conversationId, ObjectId messageId, Long senderUserId);
 
     /**
      * Delete a specific message for the current user only ("delete for me").
+     * No broadcast needed — only affects the current user's view.
      */
     void deleteForMe(ObjectId messageId, Long userId);
 }

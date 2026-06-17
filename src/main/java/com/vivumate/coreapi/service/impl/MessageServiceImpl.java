@@ -154,8 +154,12 @@ public class MessageServiceImpl implements MessageService {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public void editMessage(ObjectId conversationId, ObjectId messageId,
+    public EditMessageResult editMessage(ObjectId conversationId, ObjectId messageId,
                             Long senderUserId, MessageContent newContent) {
+        // 0. Validate membership and get participant IDs for broadcast
+        ConversationDocument conversation = conversationRepository.findByIdAndParticipantId(conversationId, senderUserId)
+                .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_ACCESS_DENIED));
+
         // 1. Fetch the current message to build edit history
         MessageDocument originalMessage = messageRepository.findActiveByIdAndUserId(messageId, senderUserId)
                 .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
@@ -178,6 +182,8 @@ public class MessageServiceImpl implements MessageService {
         updateLastMessageIfNeeded(conversationId, messageId, senderUserId, newContent);
 
         log.info("Message edited: id={}, conversationId={}, by={}", messageId, conversationId, senderUserId);
+
+        return new EditMessageResult(conversationId, messageId, newContent, conversation.getParticipantIds());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -185,7 +191,11 @@ public class MessageServiceImpl implements MessageService {
     // ═══════════════════════════════════════════════════════════
 
     @Override
-    public void recallMessage(ObjectId conversationId, ObjectId messageId, Long senderUserId) {
+    public RecallMessageResult recallMessage(ObjectId conversationId, ObjectId messageId, Long senderUserId) {
+        // 0. Validate membership and get participant IDs for broadcast
+        ConversationDocument conversation = conversationRepository.findByIdAndParticipantId(conversationId, senderUserId)
+                .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_ACCESS_DENIED));
+
         // 1. Atomic recall with ownership check
         long modified = messageRepository.deleteForEveryone(messageId, senderUserId)
                 .getModifiedCount();
@@ -198,6 +208,8 @@ public class MessageServiceImpl implements MessageService {
         replaceLastMessageIfNeeded(conversationId, messageId);
 
         log.info("Message recalled: id={}, conversationId={}, by={}", messageId, conversationId, senderUserId);
+
+        return new RecallMessageResult(conversationId, messageId, conversation.getParticipantIds());
     }
 
     // ═══════════════════════════════════════════════════════════
